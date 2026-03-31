@@ -5,14 +5,20 @@ Cascade order: ISIN → CUSIP → SEDOL → Ticker+Exchange.
 """
 
 import logging
+import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 import requests
+from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
 from src.storage.models import FigiMapping
+
+# Load .env from project root
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +27,11 @@ BATCH_SIZE = 10  # max jobs per request without API key
 RATE_LIMIT_DELAY = 12.0  # 5 req/min → 12s between requests
 MAX_RETRIES = 3
 BACKOFF_BASE = 2.0
+
+
+def get_api_key() -> str | None:
+    """Read OpenFIGI API key from environment / .env file."""
+    return os.getenv("OPENFIGI_API_KEY")
 
 
 @dataclass

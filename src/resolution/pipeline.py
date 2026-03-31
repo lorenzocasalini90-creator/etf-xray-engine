@@ -11,7 +11,7 @@ import pandas as pd
 from sqlalchemy.orm import Session
 
 from src.ingestion.ishares import ISharesFetcher
-from src.resolution.figi_resolver import FigiResolver
+from src.resolution.figi_resolver import FigiResolver, get_api_key
 from src.resolution.normalizer import deduplicate_holdings, normalize_isin, normalize_name
 from src.storage.db import get_session_factory, init_db
 from src.storage.models import EtfMetadata, FigiMapping, Holding
@@ -24,8 +24,10 @@ def run_pipeline(ticker: str, api_key: str | None = None) -> None:
 
     Args:
         ticker: ETF ticker (e.g. "CSPX").
-        api_key: Optional OpenFIGI API key.
+        api_key: Optional OpenFIGI API key. If None, reads from .env.
     """
+    if api_key is None:
+        api_key = get_api_key()
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -148,5 +150,4 @@ if __name__ == "__main__":
     import sys
 
     ticker = sys.argv[1] if len(sys.argv) > 1 else "CSPX"
-    api_key = sys.argv[2] if len(sys.argv) > 2 else None
-    run_pipeline(ticker, api_key)
+    run_pipeline(ticker)
