@@ -1,0 +1,157 @@
+"""Page 1: Portfolio Input — add ETFs, choose benchmark, run analysis."""
+
+from __future__ import annotations
+
+import os
+import sys
+
+import streamlit as st
+
+# Ensure project root is on sys.path for imports
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+st.header("📥 Portfolio Input")
+
+# ── Form: add ETF ───────────────────────────────────────────────────
+with st.form("add_etf_form", clear_on_submit=True):
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        ticker_input = st.text_input("Ticker / ISIN", placeholder="es. CSPX, SWDA, VWCE")
+    with col2:
+        capital_input = st.number_input("Importo (EUR)", min_value=0.0, value=10000.0, step=500.0)
+    submitted = st.form_submit_button("➕ Aggiungi ETF")
+
+if submitted and ticker_input.strip():
+    ticker = ticker_input.strip().upper()
+    existing_tickers = {p["ticker"] for p in st.session_state.portfolio_positions}
+    if ticker in existing_tickers:
+        st.warning(f"{ticker} è già nel portafoglio.")
+    else:
+        st.session_state.portfolio_positions.append(
+            {"ticker": ticker, "capital": capital_input}
+        )
+        # Invalidate computed results
+        for key in ("aggregated", "overlap_matrix", "redundancy_df",
+                     "factor_result", "active_share_result", "benchmark_df"):
+            st.session_state[key] = None
+        st.session_state.holdings_db.pop(ticker, None)
+        st.rerun()
+
+# ── Current portfolio ───────────────────────────────────────────────
+positions: list[dict] = st.session_state.portfolio_positions
+
+if not positions:
+    st.info("Aggiungi almeno un ETF per iniziare.")
+    st.stop()
+
+st.subheader("Portafoglio attuale")
+
+for idx, pos in enumerate(positions):
+    col_t, col_c, col_r = st.columns([3, 2, 1])
+    col_t.write(f"**{pos['ticker']}**")
+    col_c.write(f"€ {pos['capital']:,.0f}")
+    if col_r.button("🗑️", key=f"rm_{idx}"):
+        st.session_state.portfolio_positions.pop(idx)
+        st.session_state.holdings_db.pop(pos["ticker"], None)
+        for key in ("aggregated", "overlap_matrix", "redundancy_df",
+                     "factor_result", "active_share_result"):
+            st.session_state[key] = None
+        st.rerun()
+
+total_capital = sum(p["capital"] for p in positions)
+st.caption(f"Totale investito: **€ {total_capital:,.0f}**")
+
+# ── Benchmark selector ──────────────────────────────────────────────
+st.divider()
+BENCHMARK_OPTIONS = {
+    "MSCI World (SWDA/IWDA)": "MSCI_WORLD",
+    "S&P 500 (CSPX)": "SP500",
+    "MSCI EM (EIMI)": "MSCI_EM",
+    "FTSE All-World (VWCE)": "FTSE_ALL_WORLD",
+}
+bench_label = st.selectbox(
+    "Benchmark di riferimento",
+    options=list(BENCHMARK_OPTIONS.keys()),
+    index=0,
+)
+st.session_state.benchmark_name = BENCHMARK_OPTIONS[bench_label]
+
+# ── Analyse button ──────────────────────────────────────────────────
+st.divider()
+
+if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=True):
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    from src.analytics.active_share import active_share
+    from src.analytics.aggregator import aggregate_portfolio
+    from src.analytics.benchmark import BenchmarkManager
+    from src.analytics.overlap import overlap_matrix
+    from src.analytics.redundancy import redundancy_scores
+    from src.ingestion.registry import FetcherRegistry
+    from src.resolution.figi_resolver import FigiResolver
+    from src.storage.db import get_session_factory, init_db
+
+    init_db()
+    session = get_session_factory()()
+    registry = FetcherRegistry()
+    api_key = os.getenv("OPENFIGI_API_KEY")
+    resolver = FigiResolver(session, api_key=api_key)
+
+    holdings_db: dict = st.session_state.holdings_db
+    progress = st.progress(0, text="Caricamento holdings…")
+    n = len(positions)
+
+    for i, pos in enumerate(positions):
+        ticker = pos["ticker"]
+        progress.progress((i) / n, text=f"Scarico holdings di {ticker}…")
+        if ticker in holdings_db:
+            continue
+        try:
+            fetcher = registry.get_fetcher(ticker)
+            df = fetcher.fetch_holdings(ticker)
+            progress.progress((i + 0.5) / n, text=f"Risolvo FIGI per {ticker}…")
+            df = resolver.resolve_batch(df)
+            holdings_db[ticker] = df
+        except Exception as exc:
+            st.error(f"Errore per {ticker}: {exc}")
+
+    progress.progress(1.0, text="Aggregazione…")
+    st.session_state.holdings_db = holdings_db
+
+    # Aggregate
+    try:
+        aggregated = aggregate_portfolio(positions, holdings_db)
+        st.session_state.aggregated = aggregated
+    except Exception as exc:
+        st.error(f"Errore aggregazione: {exc}")
+        st.stop()
+
+    # Overlap
+    try:
+        if len(holdings_db) >= 2:
+            st.session_state.overlap_matrix = overlap_matrix(holdings_db)
+    except Exception as exc:
+        st.warning(f"Overlap non calcolato: {exc}")
+
+    # Redundancy
+    try:
+        st.session_state.redundancy_df = redundancy_scores(positions, holdings_db)
+    except Exception as exc:
+        st.warning(f"Redundancy non calcolato: {exc}")
+
+    # Benchmark + Active Share
+    try:
+        bmgr = BenchmarkManager()
+        bench_df = bmgr.get_benchmark_holdings(st.session_state.benchmark_name)
+        st.session_state.benchmark_df = bench_df
+        as_result = active_share(aggregated, bench_df)
+        st.session_state.active_share_result = as_result
+    except Exception as exc:
+        st.warning(f"Benchmark/Active Share non calcolato: {exc}")
+
+    progress.empty()
+    st.success("✅ Analisi completata! Naviga alle altre pagine per esplorare i risultati.")
