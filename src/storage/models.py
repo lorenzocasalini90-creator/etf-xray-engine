@@ -94,6 +94,7 @@ class SecurityFundamental(Base):
     roe: Mapped[float | None] = mapped_column(Float)
     debt_to_equity: Mapped[float | None] = mapped_column(Float)
     revenue_growth: Mapped[float | None] = mapped_column(Float)
+    data_source: Mapped[str | None] = mapped_column(String(10))
     as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
