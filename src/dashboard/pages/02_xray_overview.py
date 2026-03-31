@@ -21,6 +21,9 @@ if aggregated is None:
 import pandas as pd
 import plotly.express as px
 
+if 'real_weight_pct' in aggregated.columns:
+    aggregated['real_weight_pct'] = pd.to_numeric(aggregated['real_weight_pct'], errors='coerce').fillna(0.0)
+
 from src.analytics.overlap import portfolio_hhi
 
 # ── KPI row ─────────────────────────────────────────────────────────

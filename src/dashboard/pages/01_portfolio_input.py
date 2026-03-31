@@ -21,6 +21,7 @@ with st.form("add_etf_form", clear_on_submit=True):
         ticker_input = st.text_input("Ticker / ISIN", placeholder="es. CSPX, SWDA, VWCE")
     with col2:
         capital_input = st.number_input("Importo (EUR)", min_value=0.0, value=10000.0, step=500.0)
+    st.caption("Inserisci il ticker (es. CSPX, SWDA) o l'ISIN (es. IE00B5BMR087). I nomi completi non sono supportati.")
     submitted = st.form_submit_button("➕ Aggiungi ETF")
 
 if submitted and ticker_input.strip():

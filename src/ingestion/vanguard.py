@@ -66,13 +66,18 @@ class VanguardFetcher(BaseFetcher):
             logger.warning("etf-scraper unavailable — no Vanguard support")
 
     def can_handle(self, identifier: str) -> bool:
-        """Return True if *identifier* is a known Vanguard ticker.
+        """Return True if *identifier* is a known Vanguard ticker or an IE-domiciled ISIN.
 
         Args:
-            identifier: ETF ticker string.
+            identifier: ETF ticker or ISIN string.
         """
         ticker = identifier.upper().strip()
-        return ticker in self._scraper_tickers or ticker in UCITS_TICKERS
+        if ticker in self._scraper_tickers or ticker in UCITS_TICKERS:
+            return True
+        # Accept IE-domiciled ISINs as fallback (could be Vanguard UCITS)
+        if len(ticker) == 12 and ticker.startswith("IE") and ticker.isalnum():
+            return True
+        return False
 
     def fetch_holdings(
         self, identifier: str, as_of_date: date | None = None

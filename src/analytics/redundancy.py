@@ -54,6 +54,10 @@ def redundancy_scores(
             figi_weights[ticker] = {}
             continue
 
+        if "weight_pct" in df.columns:
+            df = df.copy()
+            df["weight_pct"] = pd.to_numeric(df["weight_pct"], errors="coerce").fillna(0.0)
+
         weights: dict[str, float] = {}
         for _, row in df.iterrows():
             figi = row.get("composite_figi")

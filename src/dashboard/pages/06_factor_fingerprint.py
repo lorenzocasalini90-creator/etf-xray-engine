@@ -18,8 +18,12 @@ if aggregated is None:
     st.info("Inserisci un portafoglio nella pagina **Portfolio Input** e lancia l'analisi.")
     st.stop()
 
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+
+if 'real_weight_pct' in aggregated.columns:
+    aggregated['real_weight_pct'] = pd.to_numeric(aggregated['real_weight_pct'], errors='coerce').fillna(0.0)
 
 # ── Run factor engine on demand ─────────────────────────────────────
 factor_result = st.session_state.get("factor_result")
@@ -112,7 +116,6 @@ rows.append({"Dimensione": "Quality (ROE %)", "Portafoglio": f"{roe_val:.1f}",
 rows.append({"Dimensione": "Dividend Yield %", "Portafoglio": f"{div_yield:.2f}",
              "Delta Benchmark": f"{bench_cmp['dividend_yield'].get('yield_delta', 'N/A')}" if bench_cmp else "N/A"})
 
-import pandas as pd
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 # ── Coverage disclosure ─────────────────────────────────────────────

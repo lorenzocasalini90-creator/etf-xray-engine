@@ -18,7 +18,11 @@ if redundancy_df is None:
     st.info("Inserisci un portafoglio nella pagina **Portfolio Input** e lancia l'analisi.")
     st.stop()
 
+import pandas as pd
 import plotly.express as px
+
+if 'real_weight_pct' in redundancy_df.columns:
+    redundancy_df['real_weight_pct'] = pd.to_numeric(redundancy_df['real_weight_pct'], errors='coerce').fillna(0.0)
 
 # ── Horizontal bar chart ────────────────────────────────────────────
 color_map = {"green": "#2ecc71", "yellow": "#f39c12", "red": "#e74c3c"}

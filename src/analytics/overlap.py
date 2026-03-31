@@ -26,6 +26,9 @@ def overlap_matrix(etf_holdings_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
     # Build weight vectors: ticker -> {figi: weight}
     weight_vectors: dict[str, dict[str, float]] = {}
     for ticker, df in etf_holdings_dict.items():
+        if "weight_pct" in df.columns:
+            df = df.copy()
+            df["weight_pct"] = pd.to_numeric(df["weight_pct"], errors="coerce").fillna(0.0)
         weights: dict[str, float] = {}
         for _, row in df.iterrows():
             figi = row.get("composite_figi")
@@ -71,7 +74,7 @@ def portfolio_hhi(aggregated_df: pd.DataFrame) -> dict:
     if aggregated_df.empty:
         return {"hhi": 0, "effective_n": 0, "top_5_pct": 0, "top_10_pct": 0, "top_20_pct": 0}
 
-    weights = aggregated_df["real_weight_pct"].values
+    weights = pd.to_numeric(aggregated_df["real_weight_pct"], errors="coerce").fillna(0.0).values
     total = weights.sum()
     if total == 0:
         return {"hhi": 0, "effective_n": 0, "top_5_pct": 0, "top_10_pct": 0, "top_20_pct": 0}

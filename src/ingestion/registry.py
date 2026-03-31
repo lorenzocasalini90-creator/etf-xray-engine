@@ -1,10 +1,16 @@
 """Fetcher registry with auto-discovery of concrete fetcher classes."""
 
 import importlib
+import logging
 import pkgutil
 from typing import Type
 
 from src.ingestion.base_fetcher import BaseFetcher
+
+logger = logging.getLogger(__name__)
+
+# ISIN prefixes eligible for best-effort fetching (European UCITS domiciles)
+_BESTEFFORT_ISIN_PREFIXES = ("IE", "LU", "FR")
 
 
 class FetcherRegistry:
@@ -41,6 +47,9 @@ class FetcherRegistry:
     def get_fetcher(self, identifier: str) -> BaseFetcher:
         """Return the first fetcher that can handle *identifier*.
 
+        Falls back to iShares for European-domiciled ISINs (IE/LU/FR)
+        if no fetcher explicitly claims the identifier.
+
         Args:
             identifier: ETF ticker, ISIN, or other identifier string.
 
@@ -53,6 +62,21 @@ class FetcherRegistry:
         for fetcher in self._fetchers:
             if fetcher.can_handle(identifier):
                 return fetcher
+
+        # Best-effort: try iShares for European-domiciled ISINs
+        clean = identifier.upper().strip()
+        if len(clean) == 12 and clean.isalnum() and any(
+            clean.startswith(p) for p in _BESTEFFORT_ISIN_PREFIXES
+        ):
+            from src.ingestion.ishares import ISharesFetcher
+            for fetcher in self._fetchers:
+                if isinstance(fetcher, ISharesFetcher):
+                    logger.info(
+                        "No fetcher claimed %s — trying iShares as best-effort for %s-domiciled ISIN",
+                        identifier, clean[:2],
+                    )
+                    return fetcher
+
         raise ValueError(
             f"No registered fetcher can handle identifier: {identifier!r}"
         )

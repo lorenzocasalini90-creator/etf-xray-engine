@@ -21,6 +21,9 @@ if aggregated is None:
 import pandas as pd
 import plotly.express as px
 
+if 'real_weight_pct' in aggregated.columns:
+    aggregated['real_weight_pct'] = pd.to_numeric(aggregated['real_weight_pct'], errors='coerce').fillna(0.0)
+
 from src.analytics.aggregator import country_exposure, sector_exposure
 
 sector_df = sector_exposure(aggregated)
@@ -108,7 +111,8 @@ if benchmark_df is not None and not benchmark_df.empty:
 st.subheader("Drill-down: Paese → Settore → Titolo")
 
 sun_df = aggregated[["country", "sector", "name", "real_weight_pct"]].copy()
-sun_df = sun_df.dropna(subset=["country", "sector"])
+sun_df["country"] = sun_df["country"].fillna("Unknown").replace("", "Unknown")
+sun_df["sector"] = sun_df["sector"].fillna("Unknown").replace("", "Unknown")
 # Keep top entries for readability
 sun_df = sun_df.nlargest(100, "real_weight_pct")
 

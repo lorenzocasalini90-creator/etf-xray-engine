@@ -111,17 +111,29 @@ class FactorEngine:
         """
         coverage = CoverageReport()
         coverage.total = len(df)
+        df = df.copy()
+        df["real_weight_pct"] = pd.to_numeric(df["real_weight_pct"], errors="coerce").fillna(0.0)
         coverage.total_weight = df["real_weight_pct"].sum()
 
         results: dict[str, dict] = {}
 
         # Determine which tickers to try with yfinance (top N by weight)
         sorted_df = df.sort_values("real_weight_pct", ascending=False)
-        top_tickers = set(
-            sorted_df.head(self.top_n_yfinance)["ticker"]
-            .dropna()
-            .unique()
-        )
+        # Resolve the ticker column name: prefer "ticker", fallback to "holding_ticker"
+        _ticker_col = "ticker"
+        if _ticker_col not in sorted_df.columns:
+            if "holding_ticker" in sorted_df.columns:
+                _ticker_col = "holding_ticker"
+            else:
+                # No ticker column available — skip yfinance fetch entirely
+                _ticker_col = None
+        top_tickers: set[str] = set()
+        if _ticker_col is not None:
+            top_tickers = set(
+                sorted_df.head(self.top_n_yfinance)[_ticker_col]
+                .dropna()
+                .unique()
+            )
 
         # Batch fetch from yfinance for top tickers
         yf_batch = []
@@ -129,7 +141,7 @@ class FactorEngine:
         figi_id_map: dict[str, int] = {}
         seen_tickers: set[str] = set()
         for _, row in sorted_df.iterrows():
-            ticker = row.get("ticker", "")
+            ticker = row.get(_ticker_col, "") if _ticker_col else ""
             figi = row.get("composite_figi", "")
             if not ticker or pd.isna(ticker) or ticker not in top_tickers:
                 continue
@@ -157,7 +169,7 @@ class FactorEngine:
 
         # Now classify each holding
         for _, row in df.iterrows():
-            ticker = row.get("ticker", "")
+            ticker = row.get(_ticker_col, "") if _ticker_col else ""
             sector = row.get("sector", "")
             weight = row.get("real_weight_pct", 0)
             level = "L4"
@@ -391,6 +403,12 @@ class FactorEngine:
         }
 
         if benchmark_df is not None and not benchmark_df.empty:
+            # Benchmark DataFrames use 'weight_pct'; normalize to 'real_weight_pct'
+            if "real_weight_pct" not in benchmark_df.columns and "weight_pct" in benchmark_df.columns:
+                benchmark_df = benchmark_df.copy()
+                benchmark_df["real_weight_pct"] = pd.to_numeric(
+                    benchmark_df["weight_pct"], errors="coerce"
+                ).fillna(0.0)
             bench_resolved, _ = self._resolve_fundamentals(benchmark_df)
             bench_factors = self._compute_weighted_factors(bench_resolved)
             result["benchmark_comparison"] = self._compute_delta(

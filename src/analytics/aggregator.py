@@ -48,6 +48,11 @@ def aggregate_portfolio(
         if df is None or df.empty:
             continue
 
+        # Ensure weight_pct is numeric before iterating
+        if "weight_pct" in df.columns:
+            df = df.copy()
+            df["weight_pct"] = pd.to_numeric(df["weight_pct"], errors="coerce").fillna(0.0)
+
         for _, row in df.iterrows():
             figi = row.get("composite_figi")
             if not figi or (isinstance(figi, float) and pd.isna(figi)):
@@ -91,6 +96,12 @@ def aggregate_portfolio(
         })
 
     result = pd.DataFrame(rows)
+
+    # Ensure numeric dtypes for all weight/value columns
+    for col in ['real_weight_pct', 'weight_pct', 'market_value', 'shares']:
+        if col in result.columns:
+            result[col] = pd.to_numeric(result[col], errors='coerce').fillna(0.0)
+
     result = result.sort_values("real_weight_pct", ascending=False).reset_index(drop=True)
     return result
 
@@ -107,7 +118,11 @@ def sector_exposure(aggregated_df: pd.DataFrame) -> pd.DataFrame:
     if aggregated_df.empty or "sector" not in aggregated_df.columns:
         return pd.DataFrame(columns=["sector", "weight_pct", "n_holdings"])
 
-    grouped = aggregated_df.groupby("sector", dropna=False).agg(
+    df = aggregated_df.copy()
+    df["sector"] = df["sector"].fillna("Unknown").replace("", "Unknown")
+    df["real_weight_pct"] = pd.to_numeric(df["real_weight_pct"], errors="coerce").fillna(0.0)
+
+    grouped = df.groupby("sector", dropna=False).agg(
         weight_pct=("real_weight_pct", "sum"),
         n_holdings=("composite_figi", "count"),
     ).reset_index()
@@ -126,7 +141,11 @@ def country_exposure(aggregated_df: pd.DataFrame) -> pd.DataFrame:
     if aggregated_df.empty or "country" not in aggregated_df.columns:
         return pd.DataFrame(columns=["country", "weight_pct", "n_holdings"])
 
-    grouped = aggregated_df.groupby("country", dropna=False).agg(
+    df = aggregated_df.copy()
+    df["country"] = df["country"].fillna("Unknown").replace("", "Unknown")
+    df["real_weight_pct"] = pd.to_numeric(df["real_weight_pct"], errors="coerce").fillna(0.0)
+
+    grouped = df.groupby("country", dropna=False).agg(
         weight_pct=("real_weight_pct", "sum"),
         n_holdings=("composite_figi", "count"),
     ).reset_index()

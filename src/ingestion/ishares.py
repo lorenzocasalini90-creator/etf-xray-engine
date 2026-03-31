@@ -126,13 +126,18 @@ class ISharesFetcher(BaseFetcher):
     # ------------------------------------------------------------------
 
     def can_handle(self, identifier: str) -> bool:
-        """Return True if *identifier* is a known iShares ticker.
+        """Return True if *identifier* is a known iShares ticker or an IE-domiciled ISIN.
 
         Args:
-            identifier: ETF ticker string.
+            identifier: ETF ticker or ISIN string.
         """
         ticker = identifier.upper().strip()
-        return ticker in self._scraper_tickers or ticker in UCITS_PRODUCTS
+        if ticker in self._scraper_tickers or ticker in UCITS_PRODUCTS:
+            return True
+        # Accept any Irish-domiciled ISIN (IE prefix, 12 chars) — most are iShares UCITS
+        if len(ticker) == 12 and ticker.startswith("IE") and ticker.isalnum():
+            return True
+        return False
 
     def fetch_holdings(
         self, identifier: str, as_of_date: date | None = None
@@ -152,6 +157,10 @@ class ISharesFetcher(BaseFetcher):
             df = self._fetch_ucits(ticker, as_of_date)
         elif ticker in self._scraper_tickers:
             df = self._fetch_via_scraper(ticker, as_of_date)
+        elif len(ticker) == 12 and ticker.startswith("IE") and ticker.isalnum():
+            # Try to resolve ISIN by searching UCITS_PRODUCTS by known patterns,
+            # otherwise attempt a direct iShares.com download by ISIN
+            df = self._fetch_by_isin(ticker, as_of_date)
         else:
             raise ValueError(f"Cannot handle identifier: {identifier!r}")
 
@@ -178,6 +187,53 @@ class ISharesFetcher(BaseFetcher):
         logger.info("Fetching %s via etf-scraper", ticker)
         raw = self._scraper.query_holdings(ticker, holdings_date=as_of_date)
         return self._normalise_scraper(raw, ticker)
+
+    def _fetch_by_isin(
+        self, isin: str, as_of_date: date | None
+    ) -> pd.DataFrame:
+        """Try to fetch holdings for an arbitrary ISIN from iShares.com.
+
+        Uses the iShares search/product page pattern. If it fails,
+        raises a clear error.
+
+        Args:
+            isin: 12-character ISIN (e.g. IE00BK5BCD43).
+            as_of_date: Optional reference date.
+
+        Returns:
+            DataFrame with standard schema columns.
+
+        Raises:
+            ValueError: If the ISIN cannot be fetched from iShares.
+        """
+        # Try searching iShares.com for the ISIN via the screener API
+        search_url = (
+            f"https://www.ishares.com/uk/individual/en/search#/"
+            f"q={isin}&type=fund"
+        )
+        logger.info("Attempting iShares ISIN lookup for %s", isin)
+
+        # Use the product search JSON endpoint
+        api_url = (
+            f"https://www.ishares.com/uk/individual/en/products/"
+            f"{_AJAX_TIMESTAMP}.ajax?fileType=csv&dataType=fund"
+            f"&isin={isin}"
+        )
+        try:
+            resp = _retry_request(self._session, api_url)
+            df = self._parse_ucits_csv(resp.text, isin)
+            if df.empty:
+                raise ValueError(
+                    f"iShares returned empty data for ISIN {isin}. "
+                    f"This ISIN may not be an iShares product."
+                )
+            return df
+        except Exception as exc:
+            raise ValueError(
+                f"Could not fetch holdings for ISIN {isin} from iShares.com. "
+                f"This ISIN may not be an iShares product or the product page "
+                f"format is different. Error: {exc}"
+            ) from exc
 
     def _fetch_ucits(
         self, ticker: str, as_of_date: date | None

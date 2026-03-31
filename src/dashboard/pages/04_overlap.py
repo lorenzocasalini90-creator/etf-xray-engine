@@ -20,7 +20,12 @@ if overlap_mat is None or overlap_mat.empty:
     st.info("Inserisci un portafoglio nella pagina **Portfolio Input** e lancia l'analisi. Servono almeno 2 ETF.")
     st.stop()
 
+import pandas as pd
 import plotly.figure_factory as ff
+
+aggregated = st.session_state.get("aggregated")
+if aggregated is not None and 'real_weight_pct' in aggregated.columns:
+    aggregated['real_weight_pct'] = pd.to_numeric(aggregated['real_weight_pct'], errors='coerce').fillna(0.0)
 
 from src.analytics.overlap import shared_holdings
 
