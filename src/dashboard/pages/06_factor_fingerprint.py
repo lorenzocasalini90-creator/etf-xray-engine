@@ -58,14 +58,17 @@ st.subheader("Radar — profilo fattoriale")
 size_score = scores["size"].get("Large", 0)
 vg = scores["value_growth"]
 pe_score = max(0, min(100, 100 - (vg.get("weighted_pe", 20) or 20)))  # Lower PE = higher value
-quality_score = min(100, (vg.get("weighted_pb", 1) or 1) * 20)
-roe_val = scores["quality"].get("weighted_roe", 0) or 0
-quality_roe = min(100, roe_val * 5)
-div_yield = scores["dividend_yield"].get("weighted_yield", 0) or 0
-div_score = min(100, div_yield * 30)
+roe_raw = scores["quality"].get("weighted_roe", 0) or 0
+# yfinance returns ROE as decimal (0.18 = 18%) — convert to percentage
+roe_val = roe_raw * 100 if roe_raw < 1 else roe_raw
+quality_roe = min(100, roe_val * 0.5)  # 20% ROE → score 10
+div_raw = scores["dividend_yield"].get("weighted_yield", 0) or 0
+# yfinance returns dividend yield as decimal (0.015 = 1.5%) — convert to percentage
+div_yield = div_raw * 100 if div_raw < 1 else div_raw
+div_score = min(100, div_yield * 20)  # 2% yield → score 40
 
-dimensions = ["Size (Large Cap)", "Value", "Quality", "Momentum*", "Dividend Yield"]
-portfolio_vals = [size_score, pe_score, quality_roe, 50, div_score]  # Momentum placeholder
+dimensions = ["Size (Large Cap)", "Value", "Quality", "Dividend Yield"]
+portfolio_vals = [size_score, pe_score, quality_roe, div_score]
 
 fig_radar = go.Figure()
 fig_radar.add_trace(go.Scatterpolar(
@@ -78,12 +81,15 @@ fig_radar.add_trace(go.Scatterpolar(
 
 if bench_cmp:
     # Benchmark approximation from deltas
+    roe_delta = (bench_cmp.get("quality", {}).get("roe_delta", 0) or 0)
+    roe_delta_scaled = roe_delta * 100 if abs(roe_delta) < 1 else roe_delta
+    dy_delta = (bench_cmp.get("dividend_yield", {}).get("yield_delta", 0) or 0)
+    dy_delta_scaled = dy_delta * 100 if abs(dy_delta) < 1 else dy_delta
     bench_vals = [
         max(0, size_score - (bench_cmp.get("size", {}).get("Large_delta", 0) or 0)),
         max(0, pe_score - ((bench_cmp.get("value_growth", {}).get("pe_delta", 0) or 0) * 2)),
-        max(0, quality_roe - ((bench_cmp.get("quality", {}).get("roe_delta", 0) or 0) * 5)),
-        50,
-        max(0, div_score - ((bench_cmp.get("dividend_yield", {}).get("yield_delta", 0) or 0) * 30)),
+        max(0, quality_roe - (roe_delta_scaled * 0.5)),
+        max(0, div_score - (dy_delta_scaled * 20)),
     ]
     fig_radar.add_trace(go.Scatterpolar(
         r=bench_vals + [bench_vals[0]],
@@ -100,7 +106,7 @@ fig_radar.update_layout(
     height=500,
 )
 st.plotly_chart(fig_radar, use_container_width=True)
-st.caption("*Momentum non disponibile in questa versione — valore placeholder.")
+st.caption("Nota: il fattore Momentum sarà disponibile in una versione futura.")
 
 # ── Factor scores table ─────────────────────────────────────────────
 st.subheader("Factor Scores")
@@ -111,9 +117,9 @@ rows.append({"Dimensione": "Value (P/E medio)", "Portafoglio": f"{vg.get('weight
              "Delta Benchmark": f"{bench_cmp['value_growth'].get('pe_delta', 'N/A')}" if bench_cmp else "N/A"})
 rows.append({"Dimensione": "Value (P/B medio)", "Portafoglio": f"{vg.get('weighted_pb', 'N/A')}",
              "Delta Benchmark": f"{bench_cmp['value_growth'].get('pb_delta', 'N/A')}" if bench_cmp else "N/A"})
-rows.append({"Dimensione": "Quality (ROE %)", "Portafoglio": f"{roe_val:.1f}",
+rows.append({"Dimensione": "Quality (ROE %)", "Portafoglio": f"{roe_val:.1f}%",
              "Delta Benchmark": f"{bench_cmp['quality'].get('roe_delta', 'N/A')}" if bench_cmp else "N/A"})
-rows.append({"Dimensione": "Dividend Yield %", "Portafoglio": f"{div_yield:.2f}",
+rows.append({"Dimensione": "Dividend Yield %", "Portafoglio": f"{div_yield:.2f}%",
              "Delta Benchmark": f"{bench_cmp['dividend_yield'].get('yield_delta', 'N/A')}" if bench_cmp else "N/A"})
 
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
