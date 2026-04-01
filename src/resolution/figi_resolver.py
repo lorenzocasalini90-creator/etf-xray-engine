@@ -27,7 +27,8 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 logger = logging.getLogger(__name__)
 
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
-BATCH_SIZE = 100  # OpenFIGI v3 allows 100 jobs per request
+BATCH_SIZE_WITH_KEY = 100  # OpenFIGI v3 allows 100 jobs with API key
+BATCH_SIZE_NO_KEY = 10  # Without key: smaller batches to avoid 413
 RATE_LIMIT_DELAY = 6.0  # ~10 req/min with key, ~5 req/min without
 MAX_RETRIES = 3
 BACKOFF_BASE = 2.0
@@ -69,6 +70,7 @@ class FigiResolver:
         self._http.headers["Content-Type"] = "application/json"
         if api_key:
             self._http.headers["X-OPENFIGI-APIKEY"] = api_key
+        self._batch_size = BATCH_SIZE_WITH_KEY if api_key else BATCH_SIZE_NO_KEY
         self._last_request_time: float = 0.0
         self._start_time: float = 0.0
 
@@ -253,17 +255,17 @@ class FigiResolver:
         """
         all_results: list[FigiResult | None] = []
 
-        for i in range(0, len(jobs), BATCH_SIZE):
+        for i in range(0, len(jobs), self._batch_size):
             if self._is_timed_out():
                 all_results.extend([None] * (len(jobs) - i))
                 break
 
-            batch = jobs[i:i + BATCH_SIZE]
+            batch = jobs[i:i + self._batch_size]
             self._rate_limit()
 
             logger.info(
                 "OpenFIGI batch %d-%d of %d",
-                i + 1, min(i + BATCH_SIZE, len(jobs)), len(jobs),
+                i + 1, min(i + self._batch_size, len(jobs)), len(jobs),
             )
             response_data = self._api_call(batch)
 

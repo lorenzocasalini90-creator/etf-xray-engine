@@ -321,8 +321,8 @@ class TestFigiResolverBatching:
         df = pd.DataFrame(rows)
         resolver.resolve_batch(df)
 
-        # BATCH_SIZE=100 → 25 ISINs = 1 batch of 25
-        assert batch_sizes == [25]
+        # Without API key, batch_size=10 → 25 ISINs = 3 batches (10, 10, 5)
+        assert batch_sizes == [10, 10, 5]
 
 
 class TestFigiResolverRateLimit:
@@ -343,9 +343,9 @@ class TestFigiResolverRateLimit:
         resolver._http.post = mock_post
         resolver._last_request_time = 0
 
-        # 2 batches → need >100 items to split, use 150
+        # 2 batches → 15 items with batch_size=10 → 2 batches (10+5)
         rows = []
-        for i in range(150):
+        for i in range(15):
             rows.append({
                 "holding_name": f"STOCK_{i}",
                 "holding_isin": f"US{i:010d}",

@@ -150,14 +150,27 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
 
             if result.holdings is not None:
                 df = result.holdings
-                n_h = len(df)
-                status_container.update(label=f"Risoluzione FIGI {ticker} ({n_h} holdings)… {step}")
-                df = resolver.resolve_batch(df)
-                cached_pct = (resolver.stats["cache"] / n_h * 100) if n_h else 0
-                status_container.write(
-                    f"   FIGI: {n_h - resolver.stats['unresolved']}/{n_h} risolti "
-                    f"({resolver.stats['cache']} da cache)"
-                )
+
+                # Skip FIGI resolution if data came from cache (FIGIs already in DataFrame)
+                if result.status == "cached" and "composite_figi" in df.columns:
+                    status_container.write(f"   FIGI: già risolti (dalla cache)")
+                else:
+                    n_h = len(df)
+                    status_container.update(label=f"Risoluzione FIGI {ticker} ({n_h} holdings)… {step}")
+                    df = resolver.resolve_batch(df)
+                    status_container.write(
+                        f"   FIGI: {n_h - resolver.stats['unresolved']}/{n_h} risolti "
+                        f"({resolver.stats['cache']} da cache)"
+                    )
+                    # Save FIGI-resolved holdings back to cache
+                    cache_manager.set(
+                        identifier=ticker,
+                        df=df,
+                        source=result.source,
+                        coverage_pct=result.coverage_pct,
+                        status=result.status,
+                    )
+
                 holdings_db[ticker] = df
         except Exception as exc:
             st.error(f"Errore per {ticker}: {exc}")
