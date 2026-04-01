@@ -6,6 +6,8 @@ weighted by capital allocation.
 
 import pandas as pd
 
+from src.analytics._match_key import add_match_key, build_match_keys_from_holdings
+
 
 def aggregate_portfolio(
     portfolio_positions: list[dict],
@@ -13,29 +15,30 @@ def aggregate_portfolio(
 ) -> pd.DataFrame:
     """Aggregate holdings across multiple ETFs weighted by capital allocation.
 
-    For each ETF in the portfolio, calculates:
-        peso_ETF = capitale_allocato / capitale_totale
-    For each holding in each ETF:
-        esposizione_reale[FIGI] += peso_ETF * peso_holding
+    Matches holdings by composite_figi if available, otherwise by
+    holding_isin, otherwise by holding_ticker.
 
     Args:
         portfolio_positions: List of dicts with keys:
             - ticker: ETF ticker
             - capital: Capital allocated in EUR
         holdings_db: Dict mapping ETF ticker to its holdings DataFrame.
-            Each DataFrame must have columns: composite_figi, holding_name,
-            holding_ticker, sector, country, weight_pct.
 
     Returns:
         DataFrame with columns: composite_figi, name, ticker, sector,
         country, real_weight_pct, n_etf_sources.
     """
+    empty = pd.DataFrame(columns=[
+        "composite_figi", "name", "ticker", "sector", "country",
+        "real_weight_pct", "n_etf_sources",
+    ])
+
     total_capital = sum(p["capital"] for p in portfolio_positions)
     if total_capital == 0:
-        return pd.DataFrame(columns=[
-            "composite_figi", "name", "ticker", "sector", "country",
-            "real_weight_pct", "n_etf_sources",
-        ])
+        return empty
+
+    # Pre-scan all holdings to build ticker↔ISIN cross-reference
+    build_match_keys_from_holdings(holdings_db)
 
     records: dict[str, dict] = {}
 
@@ -48,14 +51,13 @@ def aggregate_portfolio(
         if df is None or df.empty:
             continue
 
-        # Ensure weight_pct is numeric before iterating
+        df = add_match_key(df)
         if "weight_pct" in df.columns:
-            df = df.copy()
             df["weight_pct"] = pd.to_numeric(df["weight_pct"], errors="coerce").fillna(0.0)
 
         for _, row in df.iterrows():
-            figi = row.get("composite_figi")
-            if not figi or (isinstance(figi, float) and pd.isna(figi)):
+            key = row.get("_match_key")
+            if not key or (isinstance(key, float) and pd.isna(key)):
                 continue
 
             holding_weight = row.get("weight_pct", 0)
@@ -63,12 +65,12 @@ def aggregate_portfolio(
                 holding_weight = 0
             real_weight = etf_weight * (holding_weight / 100.0)
 
-            if figi in records:
-                records[figi]["real_weight_pct"] += real_weight * 100
-                records[figi]["sources"].add(ticker)
+            if key in records:
+                records[key]["real_weight_pct"] += real_weight * 100
+                records[key]["sources"].add(ticker)
             else:
-                records[figi] = {
-                    "composite_figi": figi,
+                records[key] = {
+                    "composite_figi": row.get("composite_figi") if "composite_figi" in row.index else None,
                     "name": row.get("holding_name", ""),
                     "ticker": row.get("holding_ticker", ""),
                     "sector": row.get("sector", ""),
@@ -78,10 +80,7 @@ def aggregate_portfolio(
                 }
 
     if not records:
-        return pd.DataFrame(columns=[
-            "composite_figi", "name", "ticker", "sector", "country",
-            "real_weight_pct", "n_etf_sources",
-        ])
+        return empty
 
     rows = []
     for rec in records.values():
@@ -97,7 +96,6 @@ def aggregate_portfolio(
 
     result = pd.DataFrame(rows)
 
-    # Ensure numeric dtypes for all weight/value columns
     for col in ['real_weight_pct', 'weight_pct', 'market_value', 'shares']:
         if col in result.columns:
             result[col] = pd.to_numeric(result[col], errors='coerce').fillna(0.0)
@@ -107,14 +105,7 @@ def aggregate_portfolio(
 
 
 def sector_exposure(aggregated_df: pd.DataFrame) -> pd.DataFrame:
-    """Calculate sector-level exposure from aggregated holdings.
-
-    Args:
-        aggregated_df: Output of aggregate_portfolio().
-
-    Returns:
-        DataFrame with columns: sector, weight_pct, n_holdings.
-    """
+    """Calculate sector-level exposure from aggregated holdings."""
     if aggregated_df.empty or "sector" not in aggregated_df.columns:
         return pd.DataFrame(columns=["sector", "weight_pct", "n_holdings"])
 
@@ -124,20 +115,13 @@ def sector_exposure(aggregated_df: pd.DataFrame) -> pd.DataFrame:
 
     grouped = df.groupby("sector", dropna=False).agg(
         weight_pct=("real_weight_pct", "sum"),
-        n_holdings=("composite_figi", "count"),
+        n_holdings=("name", "count"),
     ).reset_index()
     return grouped.sort_values("weight_pct", ascending=False).reset_index(drop=True)
 
 
 def country_exposure(aggregated_df: pd.DataFrame) -> pd.DataFrame:
-    """Calculate country-level exposure from aggregated holdings.
-
-    Args:
-        aggregated_df: Output of aggregate_portfolio().
-
-    Returns:
-        DataFrame with columns: country, weight_pct, n_holdings.
-    """
+    """Calculate country-level exposure from aggregated holdings."""
     if aggregated_df.empty or "country" not in aggregated_df.columns:
         return pd.DataFrame(columns=["country", "weight_pct", "n_holdings"])
 
@@ -147,6 +131,6 @@ def country_exposure(aggregated_df: pd.DataFrame) -> pd.DataFrame:
 
     grouped = df.groupby("country", dropna=False).agg(
         weight_pct=("real_weight_pct", "sum"),
-        n_holdings=("composite_figi", "count"),
+        n_holdings=("name", "count"),
     ).reset_index()
     return grouped.sort_values("weight_pct", ascending=False).reset_index(drop=True)

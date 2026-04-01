@@ -6,16 +6,17 @@ and shared holdings between ETF pairs.
 
 import pandas as pd
 
+from src.analytics._match_key import add_match_key
+
 
 def overlap_matrix(etf_holdings_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Compute NxN weighted Jaccard overlap matrix between ETFs.
 
-    Weighted Jaccard = sum(min(w_a_i, w_b_i)) / sum(max(w_a_i, w_b_i))
-    for all securities i present in either ETF.
+    Matches holdings by composite_figi if available, otherwise by
+    holding_isin, otherwise by holding_ticker.
 
     Args:
         etf_holdings_dict: Dict mapping ETF ticker to holdings DataFrame.
-            Each DataFrame must have composite_figi and weight_pct columns.
 
     Returns:
         NxN DataFrame with overlap percentages (0-100).
@@ -23,21 +24,20 @@ def overlap_matrix(etf_holdings_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
     tickers = list(etf_holdings_dict.keys())
     n = len(tickers)
 
-    # Build weight vectors: ticker -> {figi: weight}
     weight_vectors: dict[str, dict[str, float]] = {}
     for ticker, df in etf_holdings_dict.items():
+        df = add_match_key(df)
         if "weight_pct" in df.columns:
-            df = df.copy()
             df["weight_pct"] = pd.to_numeric(df["weight_pct"], errors="coerce").fillna(0.0)
         weights: dict[str, float] = {}
         for _, row in df.iterrows():
-            figi = row.get("composite_figi")
-            if not figi or (isinstance(figi, float) and pd.isna(figi)):
+            key = row.get("_match_key")
+            if not key or (isinstance(key, float) and pd.isna(key)):
                 continue
             w = row.get("weight_pct", 0)
             if pd.isna(w):
                 w = 0
-            weights[figi] = weights.get(figi, 0) + float(w)
+            weights[key] = weights.get(key, 0) + float(w)
         weight_vectors[ticker] = weights
 
     matrix = pd.DataFrame(0.0, index=tickers, columns=tickers)
@@ -47,13 +47,13 @@ def overlap_matrix(etf_holdings_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
         for j in range(i + 1, n):
             wa = weight_vectors[tickers[i]]
             wb = weight_vectors[tickers[j]]
-            all_figis = set(wa.keys()) | set(wb.keys())
+            all_keys = set(wa.keys()) | set(wb.keys())
 
-            if not all_figis:
+            if not all_keys:
                 continue
 
-            min_sum = sum(min(wa.get(f, 0), wb.get(f, 0)) for f in all_figis)
-            max_sum = sum(max(wa.get(f, 0), wb.get(f, 0)) for f in all_figis)
+            min_sum = sum(min(wa.get(k, 0), wb.get(k, 0)) for k in all_keys)
+            max_sum = sum(max(wa.get(k, 0), wb.get(k, 0)) for k in all_keys)
 
             overlap = (min_sum / max_sum * 100) if max_sum > 0 else 0.0
             matrix.iloc[i, j] = overlap
@@ -63,14 +63,7 @@ def overlap_matrix(etf_holdings_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def portfolio_hhi(aggregated_df: pd.DataFrame) -> dict:
-    """Calculate Herfindahl-Hirschman Index and concentration metrics.
-
-    Args:
-        aggregated_df: Output of aggregate_portfolio() with real_weight_pct.
-
-    Returns:
-        Dict with: hhi, effective_n, top_5_pct, top_10_pct, top_20_pct.
-    """
+    """Calculate Herfindahl-Hirschman Index and concentration metrics."""
     if aggregated_df.empty:
         return {"hhi": 0, "effective_n": 0, "top_5_pct": 0, "top_10_pct": 0, "top_20_pct": 0}
 
@@ -79,7 +72,6 @@ def portfolio_hhi(aggregated_df: pd.DataFrame) -> dict:
     if total == 0:
         return {"hhi": 0, "effective_n": 0, "top_5_pct": 0, "top_10_pct": 0, "top_20_pct": 0}
 
-    # Normalize to fractions
     fractions = weights / total
     hhi = float((fractions ** 2).sum())
     effective_n = 1.0 / hhi if hhi > 0 else 0
@@ -102,25 +94,18 @@ def shared_holdings(
     etf_a_holdings: pd.DataFrame,
     etf_b_holdings: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Find holdings shared between two ETFs with their weights.
-
-    Args:
-        etf_a_holdings: Holdings DataFrame for ETF A.
-        etf_b_holdings: Holdings DataFrame for ETF B.
-
-    Returns:
-        DataFrame with: composite_figi, name, weight_a, weight_b, weight_diff.
-    """
+    """Find holdings shared between two ETFs with their weights."""
     def _to_dict(df: pd.DataFrame) -> dict[str, dict]:
+        df = add_match_key(df)
         result: dict[str, dict] = {}
         for _, row in df.iterrows():
-            figi = row.get("composite_figi")
-            if not figi or (isinstance(figi, float) and pd.isna(figi)):
+            key = row.get("_match_key")
+            if not key or (isinstance(key, float) and pd.isna(key)):
                 continue
             w = row.get("weight_pct", 0)
             if pd.isna(w):
                 w = 0
-            result[figi] = {
+            result[key] = {
                 "name": row.get("holding_name", ""),
                 "weight": float(w),
             }
@@ -128,20 +113,20 @@ def shared_holdings(
 
     a_dict = _to_dict(etf_a_holdings)
     b_dict = _to_dict(etf_b_holdings)
-    common_figis = set(a_dict.keys()) & set(b_dict.keys())
+    common_keys = set(a_dict.keys()) & set(b_dict.keys())
 
-    if not common_figis:
+    if not common_keys:
         return pd.DataFrame(columns=[
             "composite_figi", "name", "weight_a", "weight_b", "weight_diff",
         ])
 
     rows = []
-    for figi in common_figis:
-        wa = a_dict[figi]["weight"]
-        wb = b_dict[figi]["weight"]
+    for key in common_keys:
+        wa = a_dict[key]["weight"]
+        wb = b_dict[key]["weight"]
         rows.append({
-            "composite_figi": figi,
-            "name": a_dict[figi]["name"] or b_dict[figi]["name"],
+            "composite_figi": key,
+            "name": a_dict[key]["name"] or b_dict[key]["name"],
             "weight_a": wa,
             "weight_b": wb,
             "weight_diff": abs(wa - wb),

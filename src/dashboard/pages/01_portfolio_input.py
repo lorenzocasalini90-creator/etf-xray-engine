@@ -111,17 +111,13 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
     from src.analytics.overlap import overlap_matrix
     from src.analytics.redundancy import redundancy_scores
     from src.ingestion.orchestrator import FetchOrchestrator
-    from src.resolution.figi_resolver import FigiResolver
     from src.storage.cache import HoldingsCacheManager
     from src.storage.db import get_session_factory, init_db
 
     init_db()
     session_factory = get_session_factory()
-    session = session_factory()
     cache_manager = HoldingsCacheManager(session_factory)
     orchestrator = FetchOrchestrator(cache=cache_manager)
-    api_key = os.getenv("OPENFIGI_API_KEY")
-    resolver = FigiResolver(session, api_key=api_key)
 
     holdings_db: dict = st.session_state.holdings_db
     n = len(positions)
@@ -149,29 +145,7 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
                 continue
 
             if result.holdings is not None:
-                df = result.holdings
-
-                # Skip FIGI resolution if data came from cache (FIGIs already in DataFrame)
-                if result.status == "cached" and "composite_figi" in df.columns:
-                    status_container.write(f"   FIGI: già risolti (dalla cache)")
-                else:
-                    n_h = len(df)
-                    status_container.update(label=f"Risoluzione FIGI {ticker} ({n_h} holdings)… {step}")
-                    df = resolver.resolve_batch(df)
-                    status_container.write(
-                        f"   FIGI: {n_h - resolver.stats['unresolved']}/{n_h} risolti "
-                        f"({resolver.stats['cache']} da cache)"
-                    )
-                    # Save FIGI-resolved holdings back to cache
-                    cache_manager.set(
-                        identifier=ticker,
-                        df=df,
-                        source=result.source,
-                        coverage_pct=result.coverage_pct,
-                        status=result.status,
-                    )
-
-                holdings_db[ticker] = df
+                holdings_db[ticker] = result.holdings
         except Exception as exc:
             st.error(f"Errore per {ticker}: {exc}")
 
@@ -203,7 +177,7 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
 
     # Benchmark + Active Share
     try:
-        bmgr = BenchmarkManager(resolver=resolver)
+        bmgr = BenchmarkManager()
         bench_df = bmgr.get_benchmark_holdings(st.session_state.benchmark_name)
         st.session_state.benchmark_df = bench_df
         as_result = active_share(aggregated, bench_df)
@@ -211,5 +185,5 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
     except Exception as exc:
         st.warning(f"Benchmark/Active Share non calcolato: {exc}")
 
-    progress.empty()
+    status_container.update(state="complete", expanded=False)
     st.success("✅ Analisi completata! Naviga alle altre pagine per esplorare i risultati.")

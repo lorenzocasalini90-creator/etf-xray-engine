@@ -6,6 +6,8 @@ at the individual holdings level.
 
 import pandas as pd
 
+from src.analytics._match_key import add_match_key
+
 
 def active_share(
     portfolio_aggregated: pd.DataFrame,
@@ -16,11 +18,14 @@ def active_share(
     Active Share = 0.5 * sum(|w_portfolio(i) - w_benchmark(i)|)
     for all securities i present in either portfolio or benchmark.
 
+    Matches by composite_figi if available, otherwise by holding_isin,
+    otherwise by holding_ticker.
+
     Args:
         portfolio_aggregated: Aggregated portfolio DataFrame with
-            composite_figi and real_weight_pct columns.
+            real_weight_pct column.
         benchmark_aggregated: Benchmark holdings DataFrame with
-            composite_figi and weight_pct columns.
+            weight_pct column.
 
     Returns:
         Dict with:
@@ -29,36 +34,32 @@ def active_share(
             - missed_exposures: DataFrame of significant benchmark positions
               absent from portfolio
     """
-    # Build weight dicts (normalized to sum to 100)
     port_weights = _build_weight_dict(portfolio_aggregated, "real_weight_pct")
     bench_weights = _build_weight_dict(benchmark_aggregated, "weight_pct")
 
-    # Normalize both to sum to 100
     port_weights = _normalize(port_weights)
     bench_weights = _normalize(bench_weights)
 
-    all_figis = set(port_weights.keys()) | set(bench_weights.keys())
+    all_keys = set(port_weights.keys()) | set(bench_weights.keys())
 
-    # Active Share
     diff_sum = sum(
-        abs(port_weights.get(f, 0) - bench_weights.get(f, 0)) for f in all_figis
+        abs(port_weights.get(k, 0) - bench_weights.get(k, 0)) for k in all_keys
     )
     active_share_pct = diff_sum / 2.0
 
-    # Name lookups
     port_names = _build_name_dict(portfolio_aggregated)
     bench_names = _build_name_dict(benchmark_aggregated, name_col="holding_name")
 
     # Top Active Bets: biggest overweights vs benchmark
     bets = []
-    for figi in all_figis:
-        pw = port_weights.get(figi, 0)
-        bw = bench_weights.get(figi, 0)
+    for key in all_keys:
+        pw = port_weights.get(key, 0)
+        bw = bench_weights.get(key, 0)
         diff = pw - bw
         if diff > 0:
-            name = port_names.get(figi) or bench_names.get(figi, "")
+            name = port_names.get(key) or bench_names.get(key, "")
             bets.append({
-                "composite_figi": figi,
+                "composite_figi": key,
                 "name": name,
                 "portfolio_weight": round(pw, 4),
                 "benchmark_weight": round(bw, 4),
@@ -70,13 +71,13 @@ def active_share(
 
     # Missed Exposures: significant benchmark positions absent from portfolio
     missed = []
-    for figi in bench_weights:
-        if figi not in port_weights and bench_weights[figi] >= 0.05:
-            name = bench_names.get(figi, "")
+    for key in bench_weights:
+        if key not in port_weights and bench_weights[key] >= 0.05:
+            name = bench_names.get(key, "")
             missed.append({
-                "composite_figi": figi,
+                "composite_figi": key,
                 "name": name,
-                "benchmark_weight": round(bench_weights[figi], 4),
+                "benchmark_weight": round(bench_weights[key], 4),
             })
     missed_df = pd.DataFrame(missed)
     if not missed_df.empty:
@@ -92,33 +93,42 @@ def active_share(
 
 
 def _build_weight_dict(df: pd.DataFrame, weight_col: str) -> dict[str, float]:
-    """Extract {figi: weight} from a DataFrame."""
+    """Extract {match_key: weight} from a DataFrame."""
     result: dict[str, float] = {}
     if df.empty:
         return result
+
+    df = add_match_key(df)
     for _, row in df.iterrows():
-        figi = row.get("composite_figi")
-        if not figi or (isinstance(figi, float) and pd.isna(figi)):
-            continue
+        key = row.get("_match_key")
+        if not key or (isinstance(key, float) and pd.isna(key)):
+            # Fallback: try composite_figi directly (for aggregated DataFrames)
+            key = row.get("composite_figi")
+            if not key or (isinstance(key, float) and pd.isna(key)):
+                continue
         w = row.get(weight_col, 0)
         if pd.isna(w):
             w = 0
-        result[figi] = result.get(figi, 0) + float(w)
+        result[key] = result.get(key, 0) + float(w)
     return result
 
 
 def _build_name_dict(df: pd.DataFrame, name_col: str = "name") -> dict[str, str]:
-    """Extract {figi: name} from a DataFrame."""
+    """Extract {match_key: name} from a DataFrame."""
     result: dict[str, str] = {}
     if df.empty:
         return result
+
+    df = add_match_key(df)
     for _, row in df.iterrows():
-        figi = row.get("composite_figi")
-        if not figi or (isinstance(figi, float) and pd.isna(figi)):
-            continue
+        key = row.get("_match_key")
+        if not key or (isinstance(key, float) and pd.isna(key)):
+            key = row.get("composite_figi")
+            if not key or (isinstance(key, float) and pd.isna(key)):
+                continue
         name = row.get(name_col, "")
         if name and isinstance(name, str):
-            result[figi] = name
+            result[key] = name
     return result
 
 

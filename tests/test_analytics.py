@@ -171,8 +171,8 @@ class TestOverlap:
         """Alpha/Beta share AAPL and MSFT."""
         shared = shared_holdings(etf_alpha, etf_beta)
         assert len(shared) == 2
-        figis = set(shared["composite_figi"])
-        assert figis == {"FIGI_AAPL", "FIGI_MSFT"}
+        keys = set(shared["composite_figi"])
+        assert keys == {"AAPL", "MSFT"}  # matched by holding_ticker
 
     def test_shared_holdings_alpha_gamma(self, etf_alpha, etf_gamma):
         """Alpha/Gamma share nothing."""
