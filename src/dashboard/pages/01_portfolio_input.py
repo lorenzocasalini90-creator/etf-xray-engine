@@ -149,9 +149,7 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
         except Exception as exc:
             st.error(f"Errore per {ticker}: {exc}")
 
-    status_container.update(label=f"Analisi di {n} ETF completata", state="complete", expanded=False)
-
-    progress.progress(1.0, text="Aggregazione…")
+    status_container.update(label=f"Aggregazione…")
     st.session_state.holdings_db = holdings_db
 
     # Aggregate
