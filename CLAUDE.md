@@ -48,17 +48,25 @@ Ritorna probabilità 0.0-1.0, non bool. Usato per routing:
 | SPDR | spdr.py | etf-scraper wrapper | ❌ | ✅ |
 | JustETF | justetf.py | justetf-scraping (top 10) | ✅ partial | — |
 
+### Cross-ETF Matching (src/analytics/_match_key.py)
+Il matching tra holdings di ETF diversi usa un sistema a 3 livelli:
+1. Static lookup table (src/data/ticker_isin_map.json) — 505 mappings ticker↔ISIN
+2. Dynamic lookup — impara da ETF che hanno sia ticker che ISIN (es. Amundi)
+3. Bloomberg ticker normalization — rimuove suffissi (AAPL US → AAPL)
+NO FIGI nella dashboard. Il FigiResolver è solo per uso futuro con Prefect (Fase 7).
+
 ### HoldingsCache (src/storage/cache.py)
 - TTL 7 giorni, cache-first
 - Stale fallback se fetch live fallisce
 - force_refresh=True per bypassare
-- Cache disabilitata se cache=None (default senza DB)
+- Holdings salvate CON match_key già calcolato
 
 ### Convenzioni fetcher
 - Ogni fetcher implementa BaseFetcher con try_fetch() che MAI alza exception
 - try_fetch() ritorna sempre FetchResult
 - Output normalizzato nello schema standardizzato (vedi sezione Fase 1)
 - Test con mock HTTP, mai chiamate di rete nei test
+- Regola 3 tentativi per operazioni di rete, max 10 minuti, poi documenta e fermati
 
 ## Principi
 
