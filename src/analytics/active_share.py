@@ -6,7 +6,7 @@ at the individual holdings level.
 
 import pandas as pd
 
-from src.analytics._match_key import add_match_key
+from src.analytics._match_key import add_match_key, build_match_keys_from_holdings
 
 
 def active_share(

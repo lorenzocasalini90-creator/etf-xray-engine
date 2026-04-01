@@ -6,7 +6,7 @@ and shared holdings between ETF pairs.
 
 import pandas as pd
 
-from src.analytics._match_key import add_match_key
+from src.analytics._match_key import add_match_key, build_match_keys_from_holdings
 
 
 def overlap_matrix(etf_holdings_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -23,6 +23,8 @@ def overlap_matrix(etf_holdings_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
     tickers = list(etf_holdings_dict.keys())
     n = len(tickers)
+
+    build_match_keys_from_holdings(etf_holdings_dict)
 
     weight_vectors: dict[str, dict[str, float]] = {}
     for ticker, df in etf_holdings_dict.items():

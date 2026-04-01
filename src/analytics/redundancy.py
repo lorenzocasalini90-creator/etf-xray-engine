@@ -6,7 +6,7 @@ in the portfolio, and estimates the wasted TER cost.
 
 import pandas as pd
 
-from src.analytics._match_key import add_match_key
+from src.analytics._match_key import add_match_key, build_match_keys_from_holdings
 
 # Default TER estimates for common ETFs (annual %)
 DEFAULT_TER: dict[str, float] = {
@@ -43,6 +43,8 @@ def redundancy_scores(
     ter_map = {**DEFAULT_TER, **(ter_override or {})}
     tickers = [p["ticker"] for p in portfolio_positions]
     capital_map = {p["ticker"]: p["capital"] for p in portfolio_positions}
+
+    build_match_keys_from_holdings(holdings_db)
 
     key_sets: dict[str, set[str]] = {}
     key_weights: dict[str, dict[str, float]] = {}
