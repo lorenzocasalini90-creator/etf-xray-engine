@@ -12,6 +12,22 @@ _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+# ── Session state defaults (safe for direct page navigation) ───────
+_DEFAULTS: dict = {
+    "portfolio_positions": [],
+    "holdings_db": {},
+    "aggregated": None,
+    "benchmark_name": "MSCI_WORLD",
+    "benchmark_df": None,
+    "overlap_matrix": None,
+    "redundancy_df": None,
+    "factor_result": None,
+    "active_share_result": None,
+}
+for _key, _default in _DEFAULTS.items():
+    if _key not in st.session_state:
+        st.session_state[_key] = _default
+
 st.header("📥 Portfolio Input")
 
 # ── Form: add ETF ───────────────────────────────────────────────────
