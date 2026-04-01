@@ -27,6 +27,7 @@ BATCH_SIZE = 10  # max jobs per request without API key
 RATE_LIMIT_DELAY = 12.0  # 5 req/min → 12s between requests
 MAX_RETRIES = 3
 BACKOFF_BASE = 2.0
+RESOLVE_TIMEOUT = 120  # max seconds for resolve_batch before giving up
 
 
 def get_api_key() -> str | None:
@@ -106,7 +107,8 @@ class FigiResolver:
         """Resolve holdings using batched API calls for efficiency.
 
         Groups unresolved identifiers by type and sends them in batches
-        to the OpenFIGI API.
+        to the OpenFIGI API. Aborts after ``RESOLVE_TIMEOUT`` seconds
+        to prevent blocking the UI indefinitely.
 
         Args:
             df: Holdings DataFrame with standard schema columns.
@@ -115,6 +117,7 @@ class FigiResolver:
             DataFrame with ``composite_figi`` column added.
         """
         self.stats = {k: 0 for k in self.stats}
+        self._start_time = time.time()
         df = df.copy()
         df["composite_figi"] = None
         df["_row_idx"] = range(len(df))
@@ -136,6 +139,8 @@ class FigiResolver:
 
         for step_name, id_type, col in cascade_steps:
             if not unresolved_mask.any():
+                break
+            if self._is_timed_out():
                 break
             unresolved = df.loc[unresolved_mask]
             has_id = unresolved[col].notna() & (unresolved[col].astype(str).str.strip() != "")
@@ -161,7 +166,7 @@ class FigiResolver:
             unresolved_mask = df["composite_figi"].isna()
 
         # Step 3: Ticker fallback for still-unresolved
-        if unresolved_mask.any():
+        if unresolved_mask.any() and not self._is_timed_out():
             unresolved = df.loc[unresolved_mask]
             has_ticker = unresolved["holding_ticker"].notna() & (
                 unresolved["holding_ticker"].astype(str).str.strip() != ""
@@ -345,6 +350,17 @@ class FigiResolver:
 
         logger.error("OpenFIGI API failed after %d attempts", MAX_RETRIES)
         return None
+
+    def _is_timed_out(self) -> bool:
+        """Check if the current resolve_batch has exceeded the timeout."""
+        elapsed = time.time() - getattr(self, "_start_time", time.time())
+        if elapsed > RESOLVE_TIMEOUT:
+            logger.warning(
+                "FIGI resolution timed out after %.0fs — returning partial results",
+                elapsed,
+            )
+            return True
+        return False
 
     def _rate_limit(self) -> None:
         """Enforce rate limiting between API calls."""

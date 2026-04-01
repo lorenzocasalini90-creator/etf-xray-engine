@@ -68,8 +68,11 @@ class TestCanHandle:
     def test_recognises_us_tickers(self, fetcher: ISharesFetcher) -> None:
         assert fetcher.can_handle("IVV")
 
-    def test_ie_isin_high_confidence(self, fetcher: ISharesFetcher) -> None:
-        assert fetcher.can_handle("IE00B5BMR087") == 0.9
+    def test_known_isin_full_confidence(self, fetcher: ISharesFetcher) -> None:
+        assert fetcher.can_handle("IE00B5BMR087") == 1.0  # CSPX
+
+    def test_unknown_ie_isin_high_confidence(self, fetcher: ISharesFetcher) -> None:
+        assert fetcher.can_handle("IE9999999999") == 0.9
 
     def test_unknown_tickers_low_confidence(self, fetcher: ISharesFetcher) -> None:
         for t in ("VOO", "SPY", "QQQ", "VWCE", "XDWD"):

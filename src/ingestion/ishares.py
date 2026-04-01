@@ -33,6 +33,19 @@ UCITS_PRODUCTS: dict[str, tuple[int, str]] = {
     "IEAC": (251726, "ishares-core-euro-corporate-bond-ucits-etf"),
 }
 
+# Reverse lookup: ISIN → ticker for known iShares UCITS products
+UCITS_ISIN_TO_TICKER: dict[str, str] = {
+    "IE00B5BMR087": "CSPX",
+    "IE00B4L5Y983": "IWDA",   # SWDA and IWDA share the same fund
+    "IE00BKM4GZ66": "EIMI",
+    "IE00B6R52259": "ISAC",
+    "IE00B4L5YC18": "IEMA",
+    "IE00B53SZB19": "CSNDX",
+    "IE00BFMNHK08": "IUIT",
+    "IE00B5M4WH52": "SEMB",
+    "IE00B3F81R35": "IEAC",
+}
+
 # iShares.com CSV config token (site-wide, stable)
 _AJAX_TIMESTAMP = "1506575576011"
 _ISHARES_BASE = "https://www.ishares.com/uk/individual/en/products"
@@ -131,12 +144,16 @@ class ISharesFetcher(BaseFetcher):
         Args:
             identifier: ETF ticker or ISIN string.
         """
-        ticker = identifier.upper().strip()
-        if not ticker:
+        clean = identifier.upper().strip()
+        if not clean:
             return 0.0
-        if ticker in self._scraper_tickers or ticker in UCITS_PRODUCTS:
+        if clean in self._scraper_tickers or clean in UCITS_PRODUCTS:
             return 1.0
-        if len(ticker) == 12 and ticker.startswith("IE") and ticker.isalnum():
+        # Known iShares ISIN → highest confidence
+        if clean in UCITS_ISIN_TO_TICKER:
+            return 1.0
+        # Any IE-domiciled ISIN — likely iShares
+        if len(clean) == 12 and clean.startswith("IE") and clean.isalnum():
             return 0.9
         return 0.5
 
@@ -146,22 +163,26 @@ class ISharesFetcher(BaseFetcher):
         """Fetch and normalise iShares holdings.
 
         Args:
-            identifier: ETF ticker.
+            identifier: ETF ticker or ISIN.
             as_of_date: Optional reference date.
 
         Returns:
             Validated DataFrame conforming to the standard schema.
         """
-        ticker = identifier.upper().strip()
+        clean = identifier.upper().strip()
 
-        if ticker in UCITS_PRODUCTS:
-            df = self._fetch_ucits(ticker, as_of_date)
-        elif ticker in self._scraper_tickers:
-            df = self._fetch_via_scraper(ticker, as_of_date)
-        elif len(ticker) == 12 and ticker.startswith("IE") and ticker.isalnum():
-            # Try to resolve ISIN by searching UCITS_PRODUCTS by known patterns,
-            # otherwise attempt a direct iShares.com download by ISIN
-            df = self._fetch_by_isin(ticker, as_of_date)
+        # Resolve ISIN → ticker if we know the mapping
+        if clean in UCITS_ISIN_TO_TICKER:
+            resolved_ticker = UCITS_ISIN_TO_TICKER[clean]
+            logger.info("Resolved ISIN %s → ticker %s", clean, resolved_ticker)
+            clean = resolved_ticker
+
+        if clean in UCITS_PRODUCTS:
+            df = self._fetch_ucits(clean, as_of_date)
+        elif clean in self._scraper_tickers:
+            df = self._fetch_via_scraper(clean, as_of_date)
+        elif len(clean) == 12 and clean.startswith("IE") and clean.isalnum():
+            df = self._fetch_by_isin(clean, as_of_date)
         else:
             raise ValueError(f"Cannot handle identifier: {identifier!r}")
 

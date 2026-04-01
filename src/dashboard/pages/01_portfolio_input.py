@@ -163,7 +163,7 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
 
     # Benchmark + Active Share
     try:
-        bmgr = BenchmarkManager()
+        bmgr = BenchmarkManager(resolver=resolver)
         bench_df = bmgr.get_benchmark_holdings(st.session_state.benchmark_name)
         st.session_state.benchmark_df = bench_df
         as_result = active_share(aggregated, bench_df)

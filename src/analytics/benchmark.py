@@ -2,6 +2,8 @@
 
 Uses iShares ETFs as proxies for standard benchmarks.
 Downloads and normalizes benchmark holdings for comparison.
+Also resolves holdings to Composite FIGI so that Active Share
+comparison works correctly against the portfolio.
 """
 
 import logging
@@ -34,14 +36,18 @@ class BenchmarkManager:
     """Manage benchmark proxy ETFs for portfolio comparison.
 
     Downloads holdings from iShares ETFs that track major indices
-    and provides them as normalized DataFrames.
+    and provides them as normalized DataFrames with FIGI resolution.
 
     Args:
         fetcher: Optional ISharesFetcher instance. Creates one if not provided.
+        resolver: Optional FigiResolver for FIGI resolution of benchmark
+            holdings. If ``None``, benchmark holdings will lack ``composite_figi``
+            and Active Share comparison will not work.
     """
 
-    def __init__(self, fetcher: ISharesFetcher | None = None) -> None:
+    def __init__(self, fetcher: ISharesFetcher | None = None, resolver=None) -> None:
         self._fetcher = fetcher or ISharesFetcher()
+        self._resolver = resolver
         self._cache: dict[str, pd.DataFrame] = {}
 
     def list_benchmarks(self) -> list[dict[str, str]]:
@@ -60,12 +66,16 @@ class BenchmarkManager:
     ) -> pd.DataFrame:
         """Fetch holdings for a benchmark proxy ETF.
 
+        If a ``resolver`` was provided, also resolves holdings to
+        Composite FIGI (required for Active Share comparison).
+
         Args:
             benchmark_name: Benchmark name (e.g. "MSCI_WORLD") or ETF ticker (e.g. "SWDA").
             as_of_date: Optional reference date.
 
         Returns:
-            DataFrame with standard holdings schema columns.
+            DataFrame with standard holdings schema columns
+            (+ ``composite_figi`` if resolver is available).
 
         Raises:
             ValueError: If benchmark_name is not recognized.
@@ -88,5 +98,14 @@ class BenchmarkManager:
         ticker = BENCHMARK_PROXIES[key][0]
         logger.info("Fetching benchmark %s via proxy ETF %s", key, ticker)
         df = self._fetcher.fetch_holdings(ticker, as_of_date=as_of_date)
+
+        # Resolve FIGI so Active Share can match holdings by composite_figi
+        if self._resolver is not None:
+            try:
+                logger.info("Resolving FIGI for benchmark %s (%d holdings)", key, len(df))
+                df = self._resolver.resolve_batch(df)
+            except Exception as exc:
+                logger.warning("FIGI resolution failed for benchmark %s: %s", key, exc)
+
         self._cache[cache_key] = df
         return df.copy()
