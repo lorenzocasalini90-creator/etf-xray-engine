@@ -133,6 +133,12 @@ class JustETFFetcher(BaseFetcher):
         Returns:
             ``FetchResult`` with status ``partial`` or ``failed``.
         """
+        if not self._available:
+            return FetchResult(
+                status="failed",
+                message="justetf-scraping not installed",
+                source="JustETFFetcher",
+            )
         try:
             overview = self._get_overview(identifier)
             top_holdings = overview.get("top_holdings", [])
@@ -207,32 +213,24 @@ class JustETFFetcher(BaseFetcher):
     def _get_overview(identifier: str) -> dict:
         """Call justetf_scraping to get ETF overview data.
 
-        Tries ``get_etf_overview`` first (newer API), falls back to
-        ``load_etf`` (older API).
-
         Args:
-            identifier: ETF ISIN or ticker.
+            identifier: ETF ISIN (12-char).
 
         Returns:
-            Dict with overview data.
+            Dict with overview data. The ``fund_provider`` key is aliased
+            as ``issuer`` for convenience.
 
         Raises:
             ImportError: If justetf-scraping is not installed.
             Exception: If the API call fails.
         """
-        import justetf_scraping  # type: ignore[import-untyped]
+        from justetf_scraping import get_etf_overview  # type: ignore[import-untyped]
 
-        # Try newer API first
-        if hasattr(justetf_scraping, "get_etf_overview"):
-            return justetf_scraping.get_etf_overview(identifier.strip())
-
-        # Fallback to older API
-        if hasattr(justetf_scraping, "load_etf"):
-            return justetf_scraping.load_etf(identifier.strip())
-
-        raise ImportError(
-            "justetf-scraping has neither get_etf_overview nor load_etf"
-        )
+        data = dict(get_etf_overview(identifier.strip(), include_gettex=False))
+        # Alias fund_provider → issuer for consistency
+        if "fund_provider" in data and "issuer" not in data:
+            data["issuer"] = data["fund_provider"]
+        return data
 
     @staticmethod
     def _normalise_holdings(

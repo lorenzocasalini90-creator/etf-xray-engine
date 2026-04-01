@@ -82,6 +82,8 @@ st.session_state.benchmark_name = BENCHMARK_OPTIONS[bench_label]
 # ── Analyse button ──────────────────────────────────────────────────
 st.divider()
 
+force_refresh = st.checkbox("🔄 Forza aggiornamento (ignora cache)", value=False)
+
 if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=True):
     from dotenv import load_dotenv
 
@@ -92,13 +94,16 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
     from src.analytics.benchmark import BenchmarkManager
     from src.analytics.overlap import overlap_matrix
     from src.analytics.redundancy import redundancy_scores
-    from src.ingestion.registry import FetcherRegistry
+    from src.ingestion.orchestrator import FetchOrchestrator
     from src.resolution.figi_resolver import FigiResolver
+    from src.storage.cache import HoldingsCacheManager
     from src.storage.db import get_session_factory, init_db
 
     init_db()
-    session = get_session_factory()()
-    registry = FetcherRegistry()
+    session_factory = get_session_factory()
+    session = session_factory()
+    cache_manager = HoldingsCacheManager(session_factory)
+    orchestrator = FetchOrchestrator(cache=cache_manager)
     api_key = os.getenv("OPENFIGI_API_KEY")
     resolver = FigiResolver(session, api_key=api_key)
 
@@ -109,14 +114,26 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
     for i, pos in enumerate(positions):
         ticker = pos["ticker"]
         progress.progress((i) / n, text=f"Scarico holdings di {ticker}…")
-        if ticker in holdings_db:
+        if ticker in holdings_db and not force_refresh:
             continue
         try:
-            fetcher = registry.get_fetcher(ticker)
-            df = fetcher.fetch_holdings(ticker)
-            progress.progress((i + 0.5) / n, text=f"Risolvo FIGI per {ticker}…")
-            df = resolver.resolve_batch(df)
-            holdings_db[ticker] = df
+            result = orchestrator.fetch(ticker, force_refresh=force_refresh)
+
+            if result.status == "cached":
+                st.toast(f"⚡ {ticker}: dati dalla cache — {result.message}", icon="⚡")
+            elif result.status == "success":
+                st.toast(f"✅ {ticker}: dati scaricati ora ({result.source})", icon="✅")
+            elif result.status == "partial":
+                st.warning(f"⚠️ {ticker}: {result.message}")
+            elif result.status == "failed":
+                st.error(f"❌ {ticker}: {result.message}")
+                continue
+
+            if result.holdings is not None:
+                df = result.holdings
+                progress.progress((i + 0.5) / n, text=f"Risolvo FIGI per {ticker}…")
+                df = resolver.resolve_batch(df)
+                holdings_db[ticker] = df
         except Exception as exc:
             st.error(f"Errore per {ticker}: {exc}")
 

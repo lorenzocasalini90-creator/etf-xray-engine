@@ -102,7 +102,9 @@ class BaseFetcher(ABC):
         try:
             df = self.fetch_holdings(identifier, as_of_date)
             df = self.validate_output(df)
-            n_resolved = df["holding_isin"].notna().sum()
+            has_isin = df["holding_isin"].notna()
+            has_ticker = df["holding_ticker"].notna() if "holding_ticker" in df.columns else pd.Series(False, index=df.index)
+            n_resolved = (has_isin | has_ticker).sum()
             coverage = (n_resolved / len(df) * 100) if len(df) > 0 else 0.0
             return FetchResult(
                 status="success",
