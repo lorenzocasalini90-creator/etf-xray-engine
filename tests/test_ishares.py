@@ -60,14 +60,20 @@ def fetcher() -> ISharesFetcher:
 class TestCanHandle:
     def test_recognises_ucits_tickers(self, fetcher: ISharesFetcher) -> None:
         for t in ("CSPX", "SWDA", "IWDA", "EIMI"):
-            assert fetcher.can_handle(t), f"Should handle {t}"
+            assert fetcher.can_handle(t) == 1.0, f"Should handle {t} with full confidence"
 
     def test_recognises_us_tickers(self, fetcher: ISharesFetcher) -> None:
         assert fetcher.can_handle("IVV")
 
-    def test_rejects_unknown_tickers(self, fetcher: ISharesFetcher) -> None:
+    def test_ie_isin_high_confidence(self, fetcher: ISharesFetcher) -> None:
+        assert fetcher.can_handle("IE00B5BMR087") == 0.9
+
+    def test_unknown_tickers_low_confidence(self, fetcher: ISharesFetcher) -> None:
         for t in ("VOO", "SPY", "QQQ", "VWCE", "XDWD"):
-            assert not fetcher.can_handle(t), f"Should NOT handle {t}"
+            assert fetcher.can_handle(t) == 0.5, f"Unknown {t} should get 0.5"
+
+    def test_empty_identifier(self, fetcher: ISharesFetcher) -> None:
+        assert fetcher.can_handle("") == 0.0
 
     def test_case_insensitive(self, fetcher: ISharesFetcher) -> None:
         assert fetcher.can_handle("cspx")

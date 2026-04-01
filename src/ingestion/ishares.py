@@ -125,19 +125,20 @@ class ISharesFetcher(BaseFetcher):
     # BaseFetcher interface
     # ------------------------------------------------------------------
 
-    def can_handle(self, identifier: str) -> bool:
-        """Return True if *identifier* is a known iShares ticker or an IE-domiciled ISIN.
+    def can_handle(self, identifier: str) -> float:
+        """Return confidence score (0.0–1.0) for handling *identifier*.
 
         Args:
             identifier: ETF ticker or ISIN string.
         """
         ticker = identifier.upper().strip()
+        if not ticker:
+            return 0.0
         if ticker in self._scraper_tickers or ticker in UCITS_PRODUCTS:
-            return True
-        # Accept any Irish-domiciled ISIN (IE prefix, 12 chars) — most are iShares UCITS
+            return 1.0
         if len(ticker) == 12 and ticker.startswith("IE") and ticker.isalnum():
-            return True
-        return False
+            return 0.9
+        return 0.5
 
     def fetch_holdings(
         self, identifier: str, as_of_date: date | None = None

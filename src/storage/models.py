@@ -145,6 +145,25 @@ class Portfolio(Base):
     positions: Mapped[list["PortfolioPosition"]] = relationship(back_populates="portfolio")
 
 
+class HoldingsCache(Base):
+    """Cache per holdings ETF scaricate dai fetcher."""
+
+    __tablename__ = "holdings_cache"
+    __table_args__ = (
+        UniqueConstraint("etf_identifier", "source", name="uq_holdings_cache"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    etf_identifier: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    holdings_json: Mapped[str] = mapped_column(Text, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    stale_after: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    coverage_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    num_holdings: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(20), default="success")
+
+
 class PortfolioPosition(Base):
     """Posizioni nei portafogli utente."""
 

@@ -9,9 +9,6 @@ from src.ingestion.base_fetcher import BaseFetcher
 
 logger = logging.getLogger(__name__)
 
-# ISIN prefixes eligible for best-effort fetching (European UCITS domiciles)
-_BESTEFFORT_ISIN_PREFIXES = ("IE", "LU", "FR")
-
 
 class FetcherRegistry:
     """Registry that auto-discovers and manages fetcher instances.
@@ -45,10 +42,7 @@ class FetcherRegistry:
             self._fetchers.append(instance)
 
     def get_fetcher(self, identifier: str) -> BaseFetcher:
-        """Return the first fetcher that can handle *identifier*.
-
-        Falls back to iShares for European-domiciled ISINs (IE/LU/FR)
-        if no fetcher explicitly claims the identifier.
+        """Return the fetcher with highest confidence for *identifier*.
 
         Args:
             identifier: ETF ticker, ISIN, or other identifier string.
@@ -57,28 +51,44 @@ class FetcherRegistry:
             A ``BaseFetcher`` instance that can handle the identifier.
 
         Raises:
-            ValueError: If no registered fetcher can handle the identifier.
+            ValueError: If no registered fetcher scores above 0.
         """
+        best_score = 0.0
+        best_fetcher: BaseFetcher | None = None
         for fetcher in self._fetchers:
-            if fetcher.can_handle(identifier):
-                return fetcher
+            score = fetcher.can_handle(identifier)
+            if score > best_score:
+                best_score = score
+                best_fetcher = fetcher
 
-        # Best-effort: try iShares for European-domiciled ISINs
-        clean = identifier.upper().strip()
-        if len(clean) == 12 and clean.isalnum() and any(
-            clean.startswith(p) for p in _BESTEFFORT_ISIN_PREFIXES
-        ):
-            from src.ingestion.ishares import ISharesFetcher
-            for fetcher in self._fetchers:
-                if isinstance(fetcher, ISharesFetcher):
-                    logger.info(
-                        "No fetcher claimed %s — trying iShares as best-effort for %s-domiciled ISIN",
-                        identifier, clean[:2],
-                    )
-                    return fetcher
+        if best_fetcher is not None and best_score > 0.0:
+            logger.info(
+                "Best fetcher for %s: %s (score=%.2f)",
+                identifier, type(best_fetcher).__name__, best_score,
+            )
+            return best_fetcher
 
         raise ValueError(
             f"No registered fetcher can handle identifier: {identifier!r}"
+        )
+
+    def get_fetchers_ranked(self, identifier: str) -> list[tuple[BaseFetcher, float]]:
+        """Return all fetchers sorted by descending confidence for *identifier*.
+
+        Args:
+            identifier: ETF ticker, ISIN, or other identifier string.
+
+        Returns:
+            List of (fetcher, score) tuples with score > 0, sorted descending.
+        """
+        scored = [
+            (f, f.can_handle(identifier))
+            for f in self._fetchers
+        ]
+        return sorted(
+            [(f, s) for f, s in scored if s > 0.0],
+            key=lambda x: x[1],
+            reverse=True,
         )
 
     @property

@@ -24,6 +24,9 @@ dashboard = [
 orchestration = [
     "prefect>=2.14",
 ]
+metadata = [
+    "justetf-scraping>=0.5",
+]
 dev = [
     "pytest>=7.4",
     "pytest-mock>=3.12",

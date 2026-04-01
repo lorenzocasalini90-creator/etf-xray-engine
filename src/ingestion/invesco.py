@@ -1,12 +1,17 @@
-"""Vanguard ETF holdings fetcher.
+"""Invesco ETF holdings fetcher.
 
-Supports US-listed Vanguard ETFs via etf-scraper (when the Vanguard API
-endpoint is reachable) and recognises UCITS tickers for future support.
+Invesco is the 6th largest ETF issuer in Europe (~3% market share,
+130+ ETFs). ETFs are domiciled primarily in IE.
 
-Known limitation: etf-scraper's Vanguard backend
-(eds.ecs.gisp.c1.vanguard.com) may be unreachable from some networks.
-The fetcher wraps calls with retry and clear error messages.
+Data source: etf-scraper for US-listed Invesco tickers. UCITS tickers
+are recognised but not yet fetchable via etf-scraper (US-only listings).
+
+Known limitation: etf-scraper only covers US-listed tickers (QQQ, SPLG,
+etc.). UCITS equivalents (EQQQ, SC0K, etc.) are NOT available via
+etf-scraper and will return status="failed".
 """
+
+from __future__ import annotations
 
 import logging
 import time
@@ -21,11 +26,31 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 BACKOFF_BASE = 2.0
 
-# Known UCITS tickers — recognised by can_handle but not yet fetchable
-UCITS_TICKERS: frozenset[str] = frozenset({
-    "VWCE", "VUSA", "VEVE", "VFEM", "VUAA", "VWRL",
-    "VHYL", "VNRT", "VGVF", "VVAL", "VMOM",
+# ---------------------------------------------------------------------------
+# Known Invesco ETF tickers
+# ---------------------------------------------------------------------------
+
+# US-listed tickers available via etf-scraper
+US_TICKERS: frozenset[str] = frozenset({
+    "QQQ", "QQQM", "RSP", "SPLG", "PHO", "PBW", "PRFZ",
+    "PGX", "BKLN", "SPHD", "RDVY",
 })
+
+# UCITS tickers — recognised but NOT fetchable via etf-scraper
+# TODO: find a data source for UCITS Invesco holdings (invesco.com
+# renders holdings client-side via JS, no public API found yet)
+UCITS_TICKERS: frozenset[str] = frozenset({
+    "EQQQ",   # Nasdaq-100 UCITS ETF
+    "SC0K",   # S&P 500 Equal Weight UCITS ETF
+    "RQFI",   # Euro Corporate Bond UCITS ETF
+    "MXWO",   # MSCI World UCITS ETF
+    "PSWD",   # MSCI World UCITS ETF (EUR Hedged)
+    "SXRV",   # S&P 500 UCITS ETF
+    "SMEA",   # STOXX Europe 600 UCITS ETF
+    "MXUS",   # S&P 500 UCITS ETF Acc
+})
+
+ALL_TICKERS: frozenset[str] = US_TICKERS | UCITS_TICKERS
 
 # Asset classes to exclude
 _NON_EQUITY_CLASSES = frozenset({
@@ -35,12 +60,12 @@ _NON_EQUITY_CLASSES = frozenset({
 })
 
 
-class VanguardFetcher(BaseFetcher):
-    """Fetcher for Vanguard ETFs.
+class InvescoFetcher(BaseFetcher):
+    """Fetcher for Invesco ETFs via etf-scraper.
 
     Strategy:
-    1. US-listed tickers (VOO, VTI, VGT, …) → etf-scraper.
-    2. UCITS tickers (VWCE, VUSA, …) → not yet implemented.
+    1. US-listed tickers (QQQ, RSP, …) → etf-scraper.
+    2. UCITS tickers (EQQQ, SC0K, …) → not yet supported.
     """
 
     def __init__(self) -> None:
@@ -49,21 +74,25 @@ class VanguardFetcher(BaseFetcher):
         self._init_scraper()
 
     def _init_scraper(self) -> None:
-        """Initialise etf-scraper and cache the Vanguard ticker set."""
+        """Initialise etf-scraper and cache the Invesco ticker set."""
         try:
             from etf_scraper import ETFScraper
 
             self._scraper = ETFScraper()
             df = self._scraper.listings_df
             self._scraper_tickers = set(
-                df.loc[df["provider"] == "Vanguard", "ticker"].tolist()
+                df.loc[df["provider"] == "Invesco", "ticker"].tolist()
             )
             logger.info(
-                "etf-scraper loaded: %d Vanguard tickers",
+                "etf-scraper loaded: %d Invesco tickers",
                 len(self._scraper_tickers),
             )
         except Exception:
-            logger.warning("etf-scraper unavailable — no Vanguard support")
+            logger.warning("etf-scraper unavailable — no Invesco support")
+
+    # ------------------------------------------------------------------
+    # BaseFetcher interface
+    # ------------------------------------------------------------------
 
     def can_handle(self, identifier: str) -> float:
         """Return confidence score (0.0–1.0) for handling *identifier*.
@@ -71,17 +100,20 @@ class VanguardFetcher(BaseFetcher):
         Args:
             identifier: ETF ticker or ISIN string.
         """
-        ticker = identifier.upper().strip()
-        if ticker in self._scraper_tickers or ticker in UCITS_TICKERS:
-            return 1.0
-        if len(ticker) == 12 and ticker.startswith("IE") and ticker.isalnum():
+        clean = identifier.upper().strip()
+        if not clean:
+            return 0.0
+        if clean in self._scraper_tickers or clean in ALL_TICKERS:
+            return 0.9
+        # IE-domiciled ISINs — shared with iShares/Vanguard/Xtrackers
+        if len(clean) == 12 and clean.startswith("IE") and clean.isalnum():
             return 0.3
-        return 0.0
+        return 0.2
 
     def fetch_holdings(
         self, identifier: str, as_of_date: date | None = None
     ) -> pd.DataFrame:
-        """Fetch and normalise Vanguard holdings.
+        """Fetch and normalise Invesco holdings.
 
         Args:
             identifier: ETF ticker.
@@ -89,48 +121,47 @@ class VanguardFetcher(BaseFetcher):
 
         Returns:
             Validated DataFrame conforming to the standard schema.
+
+        Raises:
+            NotImplementedError: For UCITS tickers not in etf-scraper.
+            ConnectionError: If etf-scraper API is unreachable.
         """
         ticker = identifier.upper().strip()
 
         if ticker in self._scraper_tickers:
             df = self._fetch_via_scraper(ticker, as_of_date)
         elif ticker in UCITS_TICKERS:
-            # TODO: Vanguard UCITS holdings download.
-            # The Vanguard UK/IE sites have aggressive anti-scraping
-            # protections (Akamai bot manager, dynamic JS-rendered pages).
-            # Potential future approaches:
-            #   - fund-docs.vanguard.com CSV if a stable URL is found
-            #   - justETF or another aggregator as fallback
-            #   - Selenium/Playwright for JS-rendered pages
             raise NotImplementedError(
-                f"UCITS Vanguard ETF {ticker!r} is not yet supported. "
-                "Only US-listed Vanguard ETFs work via etf-scraper."
+                f"UCITS Invesco ETF {ticker!r} is not yet supported. "
+                "etf-scraper only covers US-listed tickers. "
+                "TODO: find a data source for Invesco UCITS holdings."
             )
         else:
-            raise ValueError(f"Cannot handle identifier: {identifier!r}")
+            # Try etf-scraper anyway — it may know tickers we don't
+            df = self._fetch_via_scraper(ticker, as_of_date)
 
         df = self._filter_non_equity(df)
         return self.validate_output(df)
 
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
     def _fetch_via_scraper(
         self, ticker: str, as_of_date: date | None
     ) -> pd.DataFrame:
-        """Fetch holdings via etf-scraper (US-listed Vanguard).
-
-        Retries with exponential backoff since the Vanguard API endpoint
-        (eds.ecs.gisp.c1.vanguard.com) can be unreachable from some networks.
+        """Fetch holdings via etf-scraper (US-listed Invesco).
 
         Args:
-            ticker: US-listed Vanguard ticker.
+            ticker: US-listed Invesco ticker.
             as_of_date: Optional date.
 
         Returns:
             Raw DataFrame with column names mapped to standard schema.
-
-        Raises:
-            ConnectionError: If the Vanguard API is unreachable after retries.
         """
-        assert self._scraper is not None
+        assert self._scraper is not None, (
+            "etf-scraper is not available — cannot fetch Invesco holdings"
+        )
         last_exc: Exception | None = None
         for attempt in range(MAX_RETRIES):
             try:
@@ -147,8 +178,7 @@ class VanguardFetcher(BaseFetcher):
                 time.sleep(wait)
         raise ConnectionError(
             f"Failed to fetch {ticker} after {MAX_RETRIES} attempts. "
-            f"The Vanguard API (eds.ecs.gisp.c1.vanguard.com) may be "
-            f"unreachable from this network. Last error: {last_exc}"
+            f"Last error: {last_exc}"
         )
 
     @staticmethod
