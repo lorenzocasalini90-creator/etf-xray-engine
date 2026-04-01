@@ -124,34 +124,45 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
     resolver = FigiResolver(session, api_key=api_key)
 
     holdings_db: dict = st.session_state.holdings_db
-    progress = st.progress(0, text="Caricamento holdings…")
     n = len(positions)
+    status_container = st.status(f"Analisi di {n} ETF…", expanded=True)
 
     for i, pos in enumerate(positions):
         ticker = pos["ticker"]
-        progress.progress((i) / n, text=f"Scarico holdings di {ticker}…")
+        step = f"({i + 1}/{n})"
         if ticker in holdings_db and not force_refresh:
+            status_container.write(f"⚡ {ticker} {step} — già in memoria")
             continue
         try:
+            status_container.update(label=f"Scaricamento {ticker}… {step}")
             result = orchestrator.fetch(ticker, force_refresh=force_refresh)
 
             if result.status == "cached":
-                st.toast(f"⚡ {ticker}: dati dalla cache — {result.message}", icon="⚡")
+                status_container.write(f"⚡ {ticker} {step} — cache ({result.message})")
             elif result.status == "success":
-                st.toast(f"✅ {ticker}: dati scaricati ora ({result.source})", icon="✅")
+                n_h = len(result.holdings) if result.holdings is not None else 0
+                status_container.write(f"✅ {ticker} {step} — {n_h} holdings da {result.source}")
             elif result.status == "partial":
-                st.warning(f"⚠️ {ticker}: {result.message}")
+                status_container.write(f"⚠️ {ticker} {step} — {result.message}")
             elif result.status == "failed":
                 st.error(f"❌ {ticker}: {result.message}")
                 continue
 
             if result.holdings is not None:
                 df = result.holdings
-                progress.progress((i + 0.5) / n, text=f"Risolvo FIGI per {ticker}…")
+                n_h = len(df)
+                status_container.update(label=f"Risoluzione FIGI {ticker} ({n_h} holdings)… {step}")
                 df = resolver.resolve_batch(df)
+                cached_pct = (resolver.stats["cache"] / n_h * 100) if n_h else 0
+                status_container.write(
+                    f"   FIGI: {n_h - resolver.stats['unresolved']}/{n_h} risolti "
+                    f"({resolver.stats['cache']} da cache)"
+                )
                 holdings_db[ticker] = df
         except Exception as exc:
             st.error(f"Errore per {ticker}: {exc}")
+
+    status_container.update(label=f"Analisi di {n} ETF completata", state="complete", expanded=False)
 
     progress.progress(1.0, text="Aggregazione…")
     st.session_state.holdings_db = holdings_db

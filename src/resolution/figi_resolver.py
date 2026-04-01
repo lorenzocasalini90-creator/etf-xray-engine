@@ -2,6 +2,9 @@
 
 Resolves holdings to Composite FIGI identifiers using the OpenFIGI v3 API.
 Cascade order: ISIN → CUSIP → SEDOL → Ticker+Exchange.
+
+Performance: bulk cache lookup + batched API calls (100 jobs/request).
+For 1300 holdings with warm cache: ~0s. Cold: ~13 API calls × 12s = ~156s.
 """
 
 import logging
@@ -13,6 +16,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 from dotenv import load_dotenv
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from src.storage.models import FigiMapping
@@ -23,11 +27,11 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 logger = logging.getLogger(__name__)
 
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
-BATCH_SIZE = 10  # max jobs per request without API key
-RATE_LIMIT_DELAY = 12.0  # 5 req/min → 12s between requests
+BATCH_SIZE = 100  # OpenFIGI v3 allows 100 jobs per request
+RATE_LIMIT_DELAY = 6.0  # ~10 req/min with key, ~5 req/min without
 MAX_RETRIES = 3
 BACKOFF_BASE = 2.0
-RESOLVE_TIMEOUT = 120  # max seconds for resolve_batch before giving up
+RESOLVE_TIMEOUT = 180  # max seconds before returning partial results
 
 
 def get_api_key() -> str | None:
@@ -65,8 +69,8 @@ class FigiResolver:
         self._http.headers["Content-Type"] = "application/json"
         if api_key:
             self._http.headers["X-OPENFIGI-APIKEY"] = api_key
-        self._batch_size = 100 if api_key else BATCH_SIZE
         self._last_request_time: float = 0.0
+        self._start_time: float = 0.0
 
         # Resolution statistics
         self.stats: dict[str, int] = {
@@ -78,37 +82,12 @@ class FigiResolver:
             "unresolved": 0,
         }
 
-    def resolve_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Resolve all holdings in a DataFrame to Composite FIGIs.
-
-        Adds a ``composite_figi`` column. Uses DB cache first, then
-        calls OpenFIGI API for uncached identifiers.
-
-        Args:
-            df: Holdings DataFrame with standard schema columns.
-
-        Returns:
-            DataFrame with ``composite_figi`` column added.
-        """
-        self.stats = {k: 0 for k in self.stats}
-        results: dict[int, str | None] = {}
-
-        for idx, row in df.iterrows():
-            figi = self._resolve_single(row)
-            results[idx] = figi
-
-        df = df.copy()
-        df["composite_figi"] = df.index.map(results)
-
-        self._log_stats(len(df))
-        return df
-
     def resolve_batch(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Resolve holdings using batched API calls for efficiency.
+        """Resolve holdings using bulk cache + batched API calls.
 
-        Groups unresolved identifiers by type and sends them in batches
-        to the OpenFIGI API. Aborts after ``RESOLVE_TIMEOUT`` seconds
-        to prevent blocking the UI indefinitely.
+        1. Bulk cache lookup for ALL rows in one SQL query.
+        2. Cascade through ISIN → CUSIP → SEDOL → Ticker for uncached.
+        3. Batch API calls (100 jobs per request).
 
         Args:
             df: Holdings DataFrame with standard schema columns.
@@ -120,14 +99,10 @@ class FigiResolver:
         self._start_time = time.time()
         df = df.copy()
         df["composite_figi"] = None
-        df["_row_idx"] = range(len(df))
 
-        # Step 1: Check cache for all rows
-        for idx, row in df.iterrows():
-            cached = self._check_cache(row)
-            if cached:
-                df.at[idx, "composite_figi"] = cached
-                self.stats["cache"] += 1
+        # Step 1: Bulk cache lookup — ONE query for all identifiers
+        n_cached = self._bulk_cache_lookup(df)
+        logger.info("Cache hit: %d/%d holdings", n_cached, len(df))
 
         # Step 2: Cascade through identifier types for uncached rows
         unresolved_mask = df["composite_figi"].isna()
@@ -138,10 +113,9 @@ class FigiResolver:
         ]
 
         for step_name, id_type, col in cascade_steps:
-            if not unresolved_mask.any():
+            if not unresolved_mask.any() or self._is_timed_out():
                 break
-            if self._is_timed_out():
-                break
+
             unresolved = df.loc[unresolved_mask]
             has_id = unresolved[col].notna() & (unresolved[col].astype(str).str.strip() != "")
             candidates = unresolved.loc[has_id]
@@ -177,8 +151,7 @@ class FigiResolver:
                 jobs = []
                 job_indices = []
                 for idx, row in candidates.iterrows():
-                    job = {"idType": "TICKER", "idValue": str(row["holding_ticker"]).strip()}
-                    jobs.append(job)
+                    jobs.append({"idType": "TICKER", "idValue": str(row["holding_ticker"]).strip()})
                     job_indices.append(idx)
 
                 resolved = self._send_batches(jobs)
@@ -192,101 +165,85 @@ class FigiResolver:
                 unresolved_mask = df["composite_figi"].isna()
 
         self.stats["unresolved"] = int(unresolved_mask.sum())
-        df.drop(columns=["_row_idx"], inplace=True)
+        elapsed = time.time() - self._start_time
+        logger.info("FIGI resolution done in %.1fs", elapsed)
         self._log_stats(len(df))
         return df
 
-    def _resolve_single(self, row: pd.Series) -> str | None:
-        """Resolve a single holding row via cache then API cascade.
+    # ------------------------------------------------------------------
+    # Bulk cache
+    # ------------------------------------------------------------------
+
+    def _bulk_cache_lookup(self, df: pd.DataFrame) -> int:
+        """Look up all identifiers in DB cache with a single query.
+
+        Updates the ``composite_figi`` column in-place for cached rows.
 
         Args:
-            row: A single row from the holdings DataFrame.
+            df: DataFrame with identifier columns. Modified in place.
 
         Returns:
-            Composite FIGI string or None if unresolved.
+            Number of cache hits.
         """
-        cached = self._check_cache(row)
-        if cached:
-            self.stats["cache"] += 1
-            return cached
+        # Collect all unique identifiers to look up
+        ticker_vals = set()
+        isin_vals = set()
 
-        cascade = [
-            ("isin", "ID_ISIN", row.get("holding_isin")),
-            ("cusip", "ID_CUSIP", row.get("holding_cusip")),
-            ("sedol", "ID_SEDOL", row.get("holding_sedol")),
-        ]
+        for _, row in df.iterrows():
+            isin = row.get("holding_isin")
+            if isin and isinstance(isin, str) and isin.strip():
+                isin_vals.add(isin.strip())
+            ticker = row.get("holding_ticker")
+            if ticker and isinstance(ticker, str) and ticker.strip():
+                ticker_vals.add(ticker.strip())
 
-        for step_name, id_type, id_value in cascade:
-            if not id_value or (isinstance(id_value, str) and not id_value.strip()):
+        if not isin_vals and not ticker_vals:
+            return 0
+
+        # Single query for all identifiers
+        filters = []
+        if isin_vals:
+            filters.append(FigiMapping.isin.in_(isin_vals))
+        if ticker_vals:
+            filters.append(FigiMapping.ticker.in_(ticker_vals))
+
+        mappings = self._session.query(FigiMapping).filter(or_(*filters)).all()
+
+        # Build lookup dicts
+        isin_to_figi: dict[str, str] = {}
+        ticker_to_figi: dict[str, str] = {}
+        for m in mappings:
+            if m.isin:
+                isin_to_figi[m.isin] = m.composite_figi
+            if m.ticker:
+                ticker_to_figi[m.ticker] = m.composite_figi
+
+        # Apply to DataFrame
+        hits = 0
+        for idx, row in df.iterrows():
+            if df.at[idx, "composite_figi"] is not None:
                 continue
-            result = self._query_openfigi(id_type, str(id_value).strip())
-            if result:
-                self._save_to_cache(row, result)
-                self.stats[step_name] += 1
-                return result.composite_figi
 
-        # Ticker fallback
-        ticker = row.get("holding_ticker")
-        if ticker and isinstance(ticker, str) and ticker.strip():
-            result = self._query_openfigi("TICKER", ticker.strip())
-            if result:
-                self._save_to_cache(row, result)
-                self.stats["ticker"] += 1
-                return result.composite_figi
+            isin = row.get("holding_isin")
+            if isin and isinstance(isin, str) and isin.strip() in isin_to_figi:
+                df.at[idx, "composite_figi"] = isin_to_figi[isin.strip()]
+                hits += 1
+                continue
 
-        self.stats["unresolved"] += 1
-        return None
+            ticker = row.get("holding_ticker")
+            if ticker and isinstance(ticker, str) and ticker.strip() in ticker_to_figi:
+                df.at[idx, "composite_figi"] = ticker_to_figi[ticker.strip()]
+                hits += 1
 
-    def _check_cache(self, row: pd.Series) -> str | None:
-        """Check DB cache for an existing FIGI mapping.
+        self.stats["cache"] = hits
+        return hits
 
-        Args:
-            row: Holdings row with identifier columns.
-
-        Returns:
-            Composite FIGI if found in cache, else None.
-        """
-        isin = row.get("holding_isin")
-        if isin and isinstance(isin, str) and isin.strip():
-            mapping = self._session.query(FigiMapping).filter(
-                FigiMapping.isin == isin.strip()
-            ).first()
-            if mapping:
-                return mapping.composite_figi
-
-        cusip = row.get("holding_cusip")
-        if cusip and isinstance(cusip, str) and cusip.strip():
-            mapping = self._session.query(FigiMapping).filter(
-                FigiMapping.cusip == cusip.strip()
-            ).first()
-            if mapping:
-                return mapping.composite_figi
-
-        sedol = row.get("holding_sedol")
-        if sedol and isinstance(sedol, str) and sedol.strip():
-            mapping = self._session.query(FigiMapping).filter(
-                FigiMapping.sedol == sedol.strip()
-            ).first()
-            if mapping:
-                return mapping.composite_figi
-
-        return None
-
-    def _query_openfigi(self, id_type: str, id_value: str) -> FigiResult | None:
-        """Send a single-job query to the OpenFIGI API.
-
-        Args:
-            id_type: OpenFIGI identifier type (e.g. "ID_ISIN").
-            id_value: The identifier value.
-
-        Returns:
-            FigiResult if resolved, else None.
-        """
-        results = self._send_batches([{"idType": id_type, "idValue": id_value}])
-        return results[0] if results else None
+    # ------------------------------------------------------------------
+    # API calls
+    # ------------------------------------------------------------------
 
     def _send_batches(self, jobs: list[dict]) -> list[FigiResult | None]:
-        """Send jobs to OpenFIGI in batches, respecting rate limits.
+        """Send jobs to OpenFIGI in batches of 100, respecting rate limits.
 
         Args:
             jobs: List of OpenFIGI job dicts.
@@ -296,9 +253,18 @@ class FigiResolver:
         """
         all_results: list[FigiResult | None] = []
 
-        for i in range(0, len(jobs), self._batch_size):
-            batch = jobs[i:i + self._batch_size]
+        for i in range(0, len(jobs), BATCH_SIZE):
+            if self._is_timed_out():
+                all_results.extend([None] * (len(jobs) - i))
+                break
+
+            batch = jobs[i:i + BATCH_SIZE]
             self._rate_limit()
+
+            logger.info(
+                "OpenFIGI batch %d-%d of %d",
+                i + 1, min(i + BATCH_SIZE, len(jobs)), len(jobs),
+            )
             response_data = self._api_call(batch)
 
             if response_data is None:
@@ -353,7 +319,7 @@ class FigiResolver:
 
     def _is_timed_out(self) -> bool:
         """Check if the current resolve_batch has exceeded the timeout."""
-        elapsed = time.time() - getattr(self, "_start_time", time.time())
+        elapsed = time.time() - self._start_time
         if elapsed > RESOLVE_TIMEOUT:
             logger.warning(
                 "FIGI resolution timed out after %.0fs — returning partial results",
@@ -407,11 +373,7 @@ class FigiResolver:
         self._session.commit()
 
     def _log_stats(self, total: int) -> None:
-        """Log resolution statistics.
-
-        Args:
-            total: Total number of holdings processed.
-        """
+        """Log resolution statistics."""
         resolved = total - self.stats["unresolved"]
         pct = (resolved / total * 100) if total else 0
         logger.info(
@@ -424,14 +386,7 @@ class FigiResolver:
         )
 
     def get_report(self, total: int) -> str:
-        """Generate a human-readable resolution report.
-
-        Args:
-            total: Total number of holdings.
-
-        Returns:
-            Formatted report string.
-        """
+        """Generate a human-readable resolution report."""
         resolved = total - self.stats["unresolved"]
         pct = (resolved / total * 100) if total else 0
         return (
