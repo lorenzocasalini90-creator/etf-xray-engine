@@ -39,7 +39,10 @@ if factor_result is None:
         benchmark_df = st.session_state.get("benchmark_df")
 
         with st.spinner("Calcolo fattori in corso (può richiedere qualche minuto per dati yfinance)…"):
-            factor_result = engine.analyze(aggregated, benchmark_df=benchmark_df)
+            factor_result = engine.analyze(
+                aggregated,
+                benchmark_df=benchmark_df if benchmark_df is not None else None,
+            )
             st.session_state.factor_result = factor_result
         st.rerun()
     else:
@@ -79,7 +82,7 @@ fig_radar.add_trace(go.Scatterpolar(
     line_color="#3498db",
 ))
 
-if bench_cmp:
+if bench_cmp and st.session_state.get("benchmark_name") is not None:
     # Benchmark approximation from deltas
     roe_delta = (bench_cmp.get("quality", {}).get("roe_delta", 0) or 0)
     roe_delta_scaled = roe_delta * 100 if abs(roe_delta) < 1 else roe_delta
@@ -110,17 +113,20 @@ st.caption("Nota: il fattore Momentum sarà disponibile in una versione futura."
 
 # ── Factor scores table ─────────────────────────────────────────────
 st.subheader("Factor Scores")
+has_bench = bench_cmp and st.session_state.get("benchmark_name") is not None
 rows = []
-rows.append({"Dimensione": "Size (% Large Cap)", "Portafoglio": f"{size_score:.1f}%",
-             "Delta Benchmark": f"{bench_cmp['size'].get('Large_delta', 'N/A')}" if bench_cmp else "N/A"})
-rows.append({"Dimensione": "Value (P/E medio)", "Portafoglio": f"{vg.get('weighted_pe', 'N/A')}",
-             "Delta Benchmark": f"{bench_cmp['value_growth'].get('pe_delta', 'N/A')}" if bench_cmp else "N/A"})
-rows.append({"Dimensione": "Value (P/B medio)", "Portafoglio": f"{vg.get('weighted_pb', 'N/A')}",
-             "Delta Benchmark": f"{bench_cmp['value_growth'].get('pb_delta', 'N/A')}" if bench_cmp else "N/A"})
-rows.append({"Dimensione": "Quality (ROE %)", "Portafoglio": f"{roe_val:.1f}%",
-             "Delta Benchmark": f"{bench_cmp['quality'].get('roe_delta', 'N/A')}" if bench_cmp else "N/A"})
-rows.append({"Dimensione": "Dividend Yield %", "Portafoglio": f"{div_yield:.2f}%",
-             "Delta Benchmark": f"{bench_cmp['dividend_yield'].get('yield_delta', 'N/A')}" if bench_cmp else "N/A"})
+row_base = [
+    ("Size (% Large Cap)", f"{size_score:.1f}%", f"{bench_cmp['size'].get('Large_delta', 'N/A')}" if has_bench else None),
+    ("Value (P/E medio)", f"{vg.get('weighted_pe', 'N/A')}", f"{bench_cmp['value_growth'].get('pe_delta', 'N/A')}" if has_bench else None),
+    ("Value (P/B medio)", f"{vg.get('weighted_pb', 'N/A')}", f"{bench_cmp['value_growth'].get('pb_delta', 'N/A')}" if has_bench else None),
+    ("Quality (ROE %)", f"{roe_val:.1f}%", f"{bench_cmp['quality'].get('roe_delta', 'N/A')}" if has_bench else None),
+    ("Dividend Yield %", f"{div_yield:.2f}%", f"{bench_cmp['dividend_yield'].get('yield_delta', 'N/A')}" if has_bench else None),
+]
+for dim, port, delta in row_base:
+    row = {"Dimensione": dim, "Portafoglio": port}
+    if has_bench:
+        row["Delta Benchmark"] = delta
+    rows.append(row)
 
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 

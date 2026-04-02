@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
+import time
 
 import streamlit as st
 
@@ -23,6 +25,8 @@ _DEFAULTS: dict = {
     "redundancy_df": None,
     "factor_result": None,
     "active_share_result": None,
+    "analysis_hash": None,
+    "analysis_timestamp": None,
 }
 for _key, _default in _DEFAULTS.items():
     if _key not in st.session_state:
@@ -51,7 +55,8 @@ if submitted and ticker_input.strip():
         )
         # Invalidate computed results
         for key in ("aggregated", "overlap_matrix", "redundancy_df",
-                     "factor_result", "active_share_result", "benchmark_df"):
+                     "factor_result", "active_share_result", "benchmark_df",
+                     "analysis_hash", "analysis_timestamp"):
             st.session_state[key] = None
         st.session_state.holdings_db.pop(ticker, None)
         st.rerun()
@@ -73,7 +78,8 @@ for idx, pos in enumerate(positions):
         st.session_state.portfolio_positions.pop(idx)
         st.session_state.holdings_db.pop(pos["ticker"], None)
         for key in ("aggregated", "overlap_matrix", "redundancy_df",
-                     "factor_result", "active_share_result"):
+                     "factor_result", "active_share_result",
+                     "analysis_hash", "analysis_timestamp"):
             st.session_state[key] = None
         st.rerun()
 
@@ -83,6 +89,7 @@ st.caption(f"Totale investito: **€ {total_capital:,.0f}**")
 # ── Benchmark selector ──────────────────────────────────────────────
 st.divider()
 BENCHMARK_OPTIONS = {
+    "Nessun benchmark (analisi pura)": None,
     "MSCI World (SWDA/IWDA)": "MSCI_WORLD",
     "S&P 500 (CSPX)": "SP500",
     "MSCI EM (EIMI)": "MSCI_EM",
@@ -91,16 +98,42 @@ BENCHMARK_OPTIONS = {
 bench_label = st.selectbox(
     "Benchmark di riferimento",
     options=list(BENCHMARK_OPTIONS.keys()),
-    index=0,
+    index=1,  # Default: MSCI World
 )
 st.session_state.benchmark_name = BENCHMARK_OPTIONS[bench_label]
+st.caption("Il benchmark serve per confrontare il tuo portafoglio con il mercato. "
+           "Se hai solo ETF tematici, potresti non averne bisogno.")
 
 # ── Analyse button ──────────────────────────────────────────────────
 st.divider()
 
 force_refresh = st.checkbox("🔄 Forza aggiornamento (ignora cache)", value=False)
 
+def _portfolio_hash(positions: list[dict], benchmark_name: str | None) -> str:
+    """Compute a deterministic hash of the portfolio composition."""
+    key_parts = sorted(f"{p['ticker']}:{p['capital']}" for p in positions)
+    key_parts.append(f"bench:{benchmark_name}")
+    return hashlib.sha256("|".join(key_parts).encode()).hexdigest()[:16]
+
 if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=True):
+    # Check aggregation cache
+    current_hash = _portfolio_hash(positions, st.session_state.benchmark_name)
+    cached_hash = st.session_state.get("analysis_hash")
+    cached_time = st.session_state.get("analysis_timestamp")
+
+    if (
+        not force_refresh
+        and current_hash == cached_hash
+        and st.session_state.get("aggregated") is not None
+        and cached_time is not None
+    ):
+        elapsed_min = (time.time() - cached_time) / 60
+        st.info(
+            f"Usando risultati in cache (analizzato {elapsed_min:.0f} minuti fa). "
+            "Checka 'Forza aggiornamento' per aggiornare."
+        )
+        st.stop()
+
     from dotenv import load_dotenv
 
     load_dotenv()
@@ -155,10 +188,22 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
     # Aggregate
     try:
         aggregated = aggregate_portfolio(positions, holdings_db)
-        st.session_state.aggregated = aggregated
     except Exception as exc:
         st.error(f"Errore aggregazione: {exc}")
         st.stop()
+
+    # Enrich missing sector/country
+    try:
+        from src.analytics.enrichment import enrich_missing_data
+
+        status_container.write("🔍 Enrichment settore/paese…")
+        db_sess = session_factory()
+        aggregated = enrich_missing_data(aggregated, db_session=db_sess)
+        db_sess.close()
+    except Exception as exc:
+        st.warning(f"Enrichment parziale: {exc}")
+
+    st.session_state.aggregated = aggregated
 
     # Overlap
     try:
@@ -173,15 +218,23 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
     except Exception as exc:
         st.warning(f"Redundancy non calcolato: {exc}")
 
-    # Benchmark + Active Share
-    try:
-        bmgr = BenchmarkManager()
-        bench_df = bmgr.get_benchmark_holdings(st.session_state.benchmark_name)
-        st.session_state.benchmark_df = bench_df
-        as_result = active_share(aggregated, bench_df)
-        st.session_state.active_share_result = as_result
-    except Exception as exc:
-        st.warning(f"Benchmark/Active Share non calcolato: {exc}")
+    # Benchmark + Active Share (skip if no benchmark selected)
+    if st.session_state.benchmark_name is not None:
+        try:
+            bmgr = BenchmarkManager()
+            bench_df = bmgr.get_benchmark_holdings(st.session_state.benchmark_name)
+            st.session_state.benchmark_df = bench_df
+            as_result = active_share(aggregated, bench_df)
+            st.session_state.active_share_result = as_result
+        except Exception as exc:
+            st.warning(f"Benchmark/Active Share non calcolato: {exc}")
+    else:
+        st.session_state.benchmark_df = None
+        st.session_state.active_share_result = None
+
+    # Save cache hash and timestamp
+    st.session_state.analysis_hash = current_hash
+    st.session_state.analysis_timestamp = time.time()
 
     status_container.update(state="complete", expanded=False)
     st.success("✅ Analisi completata! Naviga alle altre pagine per esplorare i risultati.")

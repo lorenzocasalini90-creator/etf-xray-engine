@@ -32,11 +32,14 @@ hhi_stats = portfolio_hhi(aggregated)
 active_share_result = st.session_state.get("active_share_result")
 active_share_pct = active_share_result["active_share_pct"] if active_share_result else None
 
-k1, k2, k3, k4, k5 = st.columns(5)
+if active_share_pct is not None:
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k4.metric("Active Share", f"{active_share_pct:.1f} %")
+else:
+    k1, k2, k3, k5 = st.columns(4)
 k1.metric("Titoli unici", f"{len(aggregated):,}")
 k2.metric("HHI", f"{hhi_stats['hhi']:.4f}")
 k3.metric("Effective N", f"{hhi_stats['effective_n']:.0f}")
-k4.metric("Active Share", f"{active_share_pct:.1f} %" if active_share_pct is not None else "N/A")
 k5.metric("Top-5 Conc.", f"{hhi_stats['top_5_pct']:.2f} %")
 
 # ── Top 30 holdings table ──────────────────────────────────────────
