@@ -111,6 +111,20 @@ fig_radar.update_layout(
 st.plotly_chart(fig_radar, use_container_width=True)
 st.caption("Nota: il fattore Momentum sarà disponibile in una versione futura.")
 
+with st.expander("ℹ️ Cos'è il Factor Fingerprint?"):
+    st.markdown(
+        "Il \"DNA\" del tuo portafoglio lungo 4 dimensioni:\n\n"
+        "- **Size (Dimensione):** Large-cap (>$10B), Mid-cap ($2-10B) o Small-cap (<$2B). "
+        "La maggior parte degli ETF globali è dominata da large-cap.\n\n"
+        "- **Value/Growth:** P/E (prezzo/utili) basso = Value (aziende mature, dividendi). "
+        "P/E alto = Growth (aziende in crescita, reinvestono utili). "
+        "Un P/E medio sopra 25 indica tilt Growth.\n\n"
+        "- **Quality:** ROE (ritorno sul patrimonio) alto e debito basso = aziende solide. "
+        "ROE basso e debito alto = aziende più rischiose.\n\n"
+        "- **Dividend Yield:** Quanto reddito generano le aziende nel tuo portafoglio come "
+        "dividendi. Yield sotto 1% è tipico di portafogli Growth, sopra 3% di portafogli Income."
+    )
+
 # ── Factor scores table ─────────────────────────────────────────────
 st.subheader("Factor Scores")
 has_bench = bench_cmp and st.session_state.get("benchmark_name") is not None
@@ -153,6 +167,16 @@ fig_cov.add_trace(go.Bar(name="L3 Proxy", x=[l3], y=["Coverage"], orientation="h
 fig_cov.add_trace(go.Bar(name="L4 Unclassified", x=[l4], y=["Coverage"], orientation="h", marker_color="#e74c3c"))
 fig_cov.update_layout(barmode="stack", height=120, xaxis=dict(range=[0, 100], title="%"), yaxis=dict(visible=False))
 st.plotly_chart(fig_cov, use_container_width=True)
+
+with st.expander("ℹ️ Cos'è la Coverage?"):
+    st.markdown(
+        "Non tutti i titoli hanno dati fondamentali disponibili. "
+        "La barra mostra quanta percentuale del portafoglio è stata analizzata e con quale fonte:\n\n"
+        "- **L1 Sector** — classificazione settoriale disponibile\n"
+        "- **L2 Fundamentals** — dati reali (P/E, ROE, etc.) da yfinance\n"
+        "- **L3 Proxy** — stima basata sulla media del settore\n"
+        "- **L4 Unclassified** — nessun dato disponibile"
+    )
 
 # ── Factor Drivers ──────────────────────────────────────────────────
 st.subheader("Factor Drivers")

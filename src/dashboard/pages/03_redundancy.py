@@ -44,6 +44,16 @@ fig.update_layout(
 )
 st.plotly_chart(fig, use_container_width=True)
 
+with st.expander("ℹ️ Cos'è il Redundancy Score?"):
+    st.markdown(
+        "Per ogni ETF, misura quanta percentuale delle sue holdings è già presente "
+        "in un altro ETF che hai in portafoglio.\n\n"
+        "Se CSPX (S&P 500) è **75% ridondante**, significa che il 75% di quello che "
+        "compri con CSPX lo hai già tramite un altro ETF (es. SWDA che include l'S&P 500).\n\n"
+        "Quando la ridondanza è alta (>70%): considera di eliminare l'ETF ridondante "
+        "e spostare il capitale sull'ETF più ampio che già copre quei titoli."
+    )
+
 # ── TER wasted ──────────────────────────────────────────────────────
 st.subheader("TER sprecato per ridondanza")
 for _, row in redundancy_df.iterrows():
@@ -52,6 +62,14 @@ for _, row in redundancy_df.iterrows():
     verdict = row["verdict"]
     icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(verdict, "⚪")
     st.write(f"{icon} **{ticker}** — TER sprecato: **€ {ter:,.2f}** /anno")
+
+with st.expander("ℹ️ Cos'è il TER Sprecato?"):
+    st.markdown(
+        "Il costo annuo che paghi per la parte ridondante di un ETF.\n\n"
+        "**Calcolato come:** ridondanza % × TER dell'ETF × capitale investito.\n\n"
+        "**Esempio:** se hai €30.000 in un ETF con TER 0.20% e ridondanza 75%, "
+        "stai \"sprecando\" €45/anno in commissioni per esposizione che hai già."
+    )
 
 # ── Interpretation ──────────────────────────────────────────────────
 st.divider()

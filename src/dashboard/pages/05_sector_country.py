@@ -30,6 +30,16 @@ sector_df = sector_exposure(aggregated)
 country_df = country_exposure(aggregated)
 benchmark_df = st.session_state.get("benchmark_df")
 
+with st.expander("ℹ️ Cos'è l'Esposizione Settoriale e Geografica?"):
+    st.markdown(
+        "**Esposizione Settoriale:** mostra dove sono realmente investiti i tuoi soldi "
+        "per settore (Technology, Healthcare, Financials, ecc.). Se Information Technology "
+        "è al 35%, un terzo del tuo portafoglio dipende dal settore tech.\n\n"
+        "**Esposizione Geografica:** mostra in quali paesi sono domiciliate le aziende che "
+        "possiedi. Se United States è al 65%, quasi due terzi del tuo portafoglio sono in "
+        "aziende americane — anche se hai ETF con nomi \"globali\"."
+    )
+
 # ── Two-column pie/bar ──────────────────────────────────────────────
 col_s, col_c = st.columns(2)
 
@@ -106,6 +116,14 @@ if benchmark_df is not None and not benchmark_df.empty:
         )
         fig_dc.update_layout(height=max(300, len(merged_c) * 35))
         st.plotly_chart(fig_dc, use_container_width=True)
+
+    with st.expander("ℹ️ Cos'è la Deviazione vs Benchmark?"):
+        st.markdown(
+            "Quanto il tuo portafoglio è sovrappesato o sottopesato rispetto al mercato "
+            "in ogni settore/paese.\n\n"
+            "- **Barra positiva (verde)** = sovrappeso rispetto al benchmark\n"
+            "- **Barra negativa (rossa)** = sottopeso rispetto al benchmark"
+        )
 
 # ── Sunburst chart ──────────────────────────────────────────────────
 st.subheader("Drill-down: Paese → Settore → Titolo")

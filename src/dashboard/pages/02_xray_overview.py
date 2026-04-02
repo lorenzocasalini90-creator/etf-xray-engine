@@ -42,6 +42,42 @@ k2.metric("HHI", f"{hhi_stats['hhi']:.4f}")
 k3.metric("Effective N", f"{hhi_stats['effective_n']:.0f}")
 k5.metric("Top-5 Conc.", f"{hhi_stats['top_5_pct']:.2f} %")
 
+# ── KPI explanations ───────────────────────────────────────────────
+with st.expander("ℹ️ Cos'è HHI (Indice di Concentrazione)?"):
+    st.markdown(
+        "Misura quanto il tuo portafoglio dipende da pochi titoli. "
+        "Più è basso, meglio è.\n\n"
+        "- **Sotto 0.05** = ben diversificato\n"
+        "- **Sopra 0.15** = troppo concentrato\n\n"
+        "Se i tuoi top titoli crollano, un HHI alto significa che il tuo portafoglio "
+        "ne risente pesantemente."
+    )
+
+with st.expander("ℹ️ Cos'è Effective N?"):
+    st.markdown(
+        "Il numero equivalente di titoli nel tuo portafoglio se fossero tutti con lo stesso peso. "
+        "Hai 500 titoli ma Effective N è 30? Significa che il portafoglio è dominato da pochi nomi "
+        "— si comporta come se ne avessi solo 30."
+    )
+
+if active_share_pct is not None:
+    with st.expander("ℹ️ Cos'è Active Share?"):
+        st.markdown(
+            "Quanto il tuo portafoglio è diverso dal benchmark (es. MSCI World).\n\n"
+            "- **0%** = identico al mercato\n"
+            "- **100%** = completamente diverso\n\n"
+            "- **Sotto 20%** = stai pagando più TER per replicare essenzialmente un indice\n"
+            "- **Sopra 60%** = portafoglio molto diverso dal mercato, "
+            "con rischi e opportunità specifiche"
+        )
+
+with st.expander("ℹ️ Cos'è Top-5 Concentration?"):
+    st.markdown(
+        "La somma dei pesi dei tuoi 5 titoli più grandi. "
+        "Se è 25%, un quarto del tuo portafoglio dipende da 5 aziende "
+        "(probabilmente NVDA, AAPL, MSFT, AMZN, GOOGL)."
+    )
+
 # ── Top 30 holdings table ──────────────────────────────────────────
 st.subheader("Top 30 titoli per peso reale")
 top30 = aggregated.nlargest(30, "real_weight_pct")[
@@ -74,27 +110,33 @@ if active_share_result:
     col_over, col_under = st.columns(2)
 
     top_bets: pd.DataFrame = active_share_result["top_active_bets"]
+    missed: pd.DataFrame = active_share_result["missed_exposures"]
 
-    if top_bets is not None and not top_bets.empty:
-        overweights = top_bets.nlargest(10, "overweight")[
-            ["name", "portfolio_weight", "benchmark_weight", "overweight"]
-        ].copy()
-        overweights.columns = ["Titolo", "Portafoglio %", "Benchmark %", "Sovrappeso %"]
-        for c in ["Portafoglio %", "Benchmark %", "Sovrappeso %"]:
-            overweights[c] = overweights[c].map(lambda x: f"{x:.2f}")
-        overweights = overweights.reset_index(drop=True)
-
-        underweights = top_bets.nsmallest(10, "overweight")[
-            ["name", "portfolio_weight", "benchmark_weight", "overweight"]
-        ].copy()
-        underweights.columns = ["Titolo", "Portafoglio %", "Benchmark %", "Sottopeso %"]
-        for c in ["Portafoglio %", "Benchmark %", "Sottopeso %"]:
-            underweights[c] = underweights[c].map(lambda x: f"{x:.2f}")
-        underweights = underweights.reset_index(drop=True)
-
-        with col_over:
-            st.markdown("**Top 10 Sovrappesi**")
+    with col_over:
+        st.markdown("**Top 10 Sovrappesi**")
+        if top_bets is not None and not top_bets.empty:
+            overweights = top_bets.nlargest(10, "overweight")[
+                ["name", "portfolio_weight", "benchmark_weight", "overweight"]
+            ].copy()
+            overweights.columns = ["Titolo", "Portafoglio %", "Benchmark %", "Delta %"]
+            for c in ["Portafoglio %", "Benchmark %", "Delta %"]:
+                overweights[c] = overweights[c].map(lambda x: f"{x:.2f}")
+            overweights = overweights.reset_index(drop=True)
+            overweights.index = overweights.index + 1
             st.dataframe(overweights, use_container_width=True)
-        with col_under:
-            st.markdown("**Top 10 Sottopesi**")
+        else:
+            st.info("Nessun sovrappeso rilevato.")
+
+    with col_under:
+        st.markdown("**Top 10 Sottopesi (assenti dal portafoglio)**")
+        if missed is not None and not missed.empty:
+            underweights = missed.nlargest(10, "benchmark_weight")[
+                ["name", "benchmark_weight"]
+            ].copy()
+            underweights.columns = ["Titolo", "Benchmark %"]
+            underweights["Benchmark %"] = underweights["Benchmark %"].map(lambda x: f"{x:.2f}")
+            underweights = underweights.reset_index(drop=True)
+            underweights.index = underweights.index + 1
             st.dataframe(underweights, use_container_width=True)
+        else:
+            st.info("Nessun titolo benchmark significativo assente dal portafoglio.")

@@ -50,6 +50,15 @@ fig.update_layout(
 )
 st.plotly_chart(fig, use_container_width=True)
 
+with st.expander("ℹ️ Cos'è l'Overlap?"):
+    st.markdown(
+        "La percentuale di esposizione condivisa tra due ETF. "
+        "Un overlap del **53%** tra CSPX e SWDA significa che più della metà del peso "
+        "dei due ETF è investita negli stessi titoli.\n\n"
+        "Overlap alto (**>50%**) tra due ETF nel tuo portafoglio suggerisce che potresti "
+        "semplificare rimuovendo uno dei due."
+    )
+
 # ── Shared holdings detail ──────────────────────────────────────────
 st.subheader("Dettaglio titoli in comune")
 tickers = list(holdings_db.keys())
