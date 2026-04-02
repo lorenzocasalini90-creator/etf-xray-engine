@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import signal
 from dataclasses import dataclass
 from datetime import date
 
@@ -11,6 +12,8 @@ from src.ingestion.registry import FetcherRegistry
 from src.storage.cache import HoldingsCacheManager
 
 logger = logging.getLogger(__name__)
+
+METADATA_TIMEOUT = 30  # max seconds for resolve_metadata before giving up
 
 
 @dataclass
@@ -30,11 +33,20 @@ class ETFMetadata:
     ter: float | None = None
 
 
+class _MetadataTimeout(Exception):
+    """Raised when metadata resolution exceeds the allowed time."""
+
+
+def _timeout_handler(signum, frame):
+    raise _MetadataTimeout("Metadata resolution timed out")
+
+
 def resolve_metadata(identifier: str) -> ETFMetadata | None:
     """Resolve ETF metadata via JustETFFetcher (if justetf-scraping installed).
 
     Uses ``JustETFFetcher.get_metadata()`` which calls ``get_etf_overview``
     to obtain ISIN, issuer name, TER, fund size for any UCITS ETF.
+    Times out after ``METADATA_TIMEOUT`` seconds to prevent hanging.
 
     Args:
         identifier: ETF ticker, ISIN, or name.
@@ -49,7 +61,15 @@ def resolve_metadata(identifier: str) -> ETFMetadata | None:
         if not fetcher._available:
             return None
 
-        meta = fetcher.get_metadata(identifier)
+        # Set alarm-based timeout to prevent hanging on network calls
+        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+        signal.alarm(METADATA_TIMEOUT)
+        try:
+            meta = fetcher.get_metadata(identifier)
+        finally:
+            signal.alarm(0)  # Cancel alarm
+            signal.signal(signal.SIGALRM, old_handler)
+
         if meta is None:
             return None
 
@@ -59,6 +79,12 @@ def resolve_metadata(identifier: str) -> ETFMetadata | None:
             name=meta.name,
             ter=meta.ter,
         )
+    except _MetadataTimeout:
+        logger.warning(
+            "Metadata resolution timed out after %ds for %s",
+            METADATA_TIMEOUT, identifier,
+        )
+        return None
     except Exception as exc:
         logger.warning("Metadata resolution failed for %s: %s", identifier, exc)
         return None
@@ -181,6 +207,12 @@ class FetchOrchestrator:
             source="FetchOrchestrator",
         )
 
+    @staticmethod
+    def _looks_like_ie_isin(identifier: str) -> bool:
+        """Check if identifier looks like an Irish-domiciled ISIN."""
+        clean = identifier.strip().upper()
+        return len(clean) == 12 and clean.startswith("IE") and clean.isalnum()
+
     def _try_live_fetch(
         self,
         identifier: str,
@@ -189,6 +221,12 @@ class FetchOrchestrator:
         as_of_date: date | None,
     ) -> FetchResult | None:
         """Try all live fetch strategies in cascade order.
+
+        Order:
+        1. Issuer-specific fetcher (from metadata).
+        2. For IE ISINs without metadata: try iShares directly.
+        3. Brute force all fetchers ranked by confidence.
+        4. JustETF top-10 fallback (always last).
 
         Args:
             identifier: Original user identifier.
@@ -207,7 +245,14 @@ class FetchOrchestrator:
             if result and result.status != "failed":
                 return result
 
-        # Brute force
+        # IE ISIN fast path: try iShares directly when metadata is missing
+        if not (metadata and metadata.issuer) and self._looks_like_ie_isin(lookup_id):
+            logger.info("IE ISIN detected without issuer info — trying iShares directly")
+            result = self._try_issuer_fetcher("ishares", lookup_id, as_of_date)
+            if result and result.status != "failed":
+                return result
+
+        # Brute force all fetchers (excluding JustETF, which scores 0.1)
         result = self._try_all_fetchers(lookup_id, as_of_date)
         if result and result.status != "failed":
             return result
@@ -217,7 +262,7 @@ class FetchOrchestrator:
             if result and result.status != "failed":
                 return result
 
-        # JustETF fallback
+        # JustETF fallback — always last resort
         result = self._try_justetf_fallback(lookup_id, metadata)
         if result and result.status != "failed":
             return result

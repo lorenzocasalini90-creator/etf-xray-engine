@@ -136,14 +136,17 @@ def build_match_keys_from_holdings(holdings_db: dict[str, pd.DataFrame]) -> None
 def _get_match_key_for_row(row) -> str | None:
     """Derive match key for a single row.
 
+    Handles both standard schema (``holding_ticker``, ``holding_isin``,
+    ``holding_name``) and aggregated format (``ticker``, ``name``).
+
     Priority:
     1. Ticker (normalized) — if available
     2. ISIN -> resolve to ticker via lookup, else use ISIN
     3. composite_figi
     4. Normalized name -> resolve via name lookup
     """
-    # Try ticker
-    ticker_raw = row.get("holding_ticker")
+    # Try ticker — standard schema or aggregated format
+    ticker_raw = row.get("holding_ticker") or row.get("ticker")
     if ticker_raw and isinstance(ticker_raw, str) and ticker_raw.strip():
         return _normalize_ticker(ticker_raw)
 
@@ -160,8 +163,8 @@ def _get_match_key_for_row(row) -> str | None:
         if figi and isinstance(figi, str) and figi.strip():
             return figi.strip()
 
-    # Last resort: normalized name
-    name_raw = row.get("holding_name")
+    # Last resort: normalized name — standard schema or aggregated format
+    name_raw = row.get("holding_name") or row.get("name")
     if name_raw and isinstance(name_raw, str):
         norm = _normalize_name(name_raw)
         if norm in _NAME_TO_KEY:

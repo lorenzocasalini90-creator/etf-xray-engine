@@ -32,7 +32,7 @@ BATCH_SIZE_NO_KEY = 10  # Without key: smaller batches to avoid 413
 RATE_LIMIT_DELAY = 6.0  # ~10 req/min with key, ~5 req/min without
 MAX_RETRIES = 3
 BACKOFF_BASE = 2.0
-RESOLVE_TIMEOUT = 180  # max seconds before returning partial results
+RESOLVE_TIMEOUT = 60  # max seconds before returning partial results
 
 
 def get_api_key() -> str | None:
