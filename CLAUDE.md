@@ -127,3 +127,23 @@ src/
 ├── flows/           # Layer 5: Prefect orchestration
 └── interface/       # CLI e API entry points
 ```
+
+## Workflow e Skills Installate (aggiornato 2 Aprile 2026)
+
+### Skills attive
+- **Superpowers** (obra/superpowers): brainstorming, plan-to-execute, TDD, systematic debugging, subagent-driven development, verification-before-completion
+- **Frontend Design** (anthropics): design production-grade, anti "AI slop", tipografia e colori distintivi
+
+### Regole di workflow (da Boris Cherny)
+1. **Plan Mode Default**: entrare in plan mode per qualunque task con 3+ step o decisioni architetturali. Se qualcosa va storto, STOP e ri-pianificare immediatamente.
+2. **Self-Improvement Loop**: dopo ogni correzione dall'utente, scrivere la lezione in un file lessons.md. Scrivere regole che prevengano lo stesso errore. Rileggere le lezioni a inizio sessione.
+3. **Verification Before Done**: mai dichiarare un task completato senza provarlo. Diff, test, log. Chiedersi: "un senior engineer approverebbe questo?"
+4. **Autonomous Bug Fixing**: quando ricevi un bug report, fixalo direttamente. Niente hand-holding. Guarda log, errori, test che falliscono — poi risolvili.
+5. **Demand Elegance**: per fix non-triviali, chiedersi "esiste un modo più elegante?" Se un fix sembra hacky, implementare la soluzione elegante. Per fix semplici e ovvi, non over-engineerare.
+6. **Subagent Strategy**: usare subagenti per ricerca, esplorazione e analisi parallela. Un task per subagente. Tenere il contesto principale pulito.
+
+### Quando usare le skill
+- Prima di implementare qualunque feature: `/superpowers:brainstorm` → `/superpowers:write-plan` → `/superpowers:execute-plan`
+- Prima di fixare bug complessi: usare systematic-debugging (4 fasi: riprodurre, isolare, root cause, fix)
+- Prima di toccare la UI: attivare frontend-design skill
+- MAI girare in loop sullo stesso errore per più di 3 tentativi. Fermarsi, diagnosticare, ri-pianificare.

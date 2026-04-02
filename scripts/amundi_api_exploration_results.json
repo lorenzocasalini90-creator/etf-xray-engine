@@ -1,0 +1,275 @@
+{
+  "exploration_date": "2026-04-01",
+  "target_etf": {
+    "ticker": "CW8",
+    "isin": "LU1681043599",
+    "name": "Amundi MSCI World Swap UCITS ETF EUR Acc"
+  },
+  "working_endpoints": {
+    "1_product_data": {
+      "url": "POST https://www.amundietf.fr/mapi/ProductAPI/getProductsData",
+      "description": "Main API for ETF product data, characteristics, metrics, AND holdings composition",
+      "content_type": "application/json",
+      "http_status": 200,
+      "authentication": "None required",
+      "request_payload_minimal": {
+        "characteristics": [
+          "ISIN",
+          "SHARE_MARKETING_NAME"
+        ],
+        "metrics": [],
+        "context": {
+          "countryCode": "FRA",
+          "languageCode": "fr",
+          "userProfileName": "INSTIT"
+        },
+        "productType": "ALL",
+        "productIds": [
+          "LU1681043599"
+        ]
+      },
+      "request_payload_with_holdings": {
+        "characteristics": [
+          "ISIN",
+          "TICKER",
+          "SHARE_MARKETING_NAME",
+          "CURRENCY",
+          "AUM",
+          "AUM_IN_EURO",
+          "FUND_AUM_IN_EURO",
+          "ASSET_CLASS",
+          "SUBASSET_CLASS",
+          "INVESTMENT_ZONE",
+          "TER",
+          "NAV",
+          "NAV_DATE_DISPLAYED",
+          "INCEPTION_DATE",
+          "FUND_TYPE",
+          "FUND_REPLICATION_METHODOLOGY",
+          "FUND_SFDR_CLASSIFICATION",
+          "DISTRIBUTION_POLICY",
+          "MAIN_LISTING",
+          "WKN",
+          "MNEMO",
+          "INDEX_TICKER",
+          "EXCHANGE_PLACE",
+          "FUND_DOMICILIATION_COUNTRY",
+          "SRRI",
+          "LISTING_PLACES",
+          "MARKET",
+          "SHARE_TYPE",
+          "CORE",
+          "IS_ESG",
+          "FUND_ISSUER",
+          "CATEGORY",
+          "DESCRIPTIF",
+          "STRATEGY"
+        ],
+        "metrics": [
+          {
+            "indicator": "shareCumulativePerformance",
+            "period": "ONE_YEAR"
+          },
+          {
+            "indicator": "shareCumulativePerformance",
+            "period": "YEAR_TO_DATE"
+          },
+          {
+            "indicator": "shareCumulativePerformance",
+            "period": "THREE_YEARS"
+          },
+          {
+            "indicator": "shareCumulativePerformance",
+            "period": "FIVE_YEARS"
+          },
+          {
+            "indicator": "shareCumulativePerformance",
+            "period": "TEN_YEARS"
+          }
+        ],
+        "context": {
+          "countryCode": "FRA",
+          "languageCode": "fr",
+          "userProfileName": "INSTIT"
+        },
+        "productType": "ALL",
+        "productIds": [
+          "LU1681043599"
+        ],
+        "breakDowns": [
+          "FUND_TOP10",
+          "INDEX_TOP10",
+          "FUND_SECTORS",
+          "INDEX_SECTORS",
+          "FUND_COUNTRIES",
+          "INDEX_COUNTRIES",
+          "FUND_RATINGS",
+          "INDEX_RATINGS",
+          "FUND_MATURITIES",
+          "INDEX_MATURITIES",
+          "FUND_CURRENCIES",
+          "INDEX_CURRENCIES",
+          "FUND_RAWMATERIALS",
+          "INDEX_RAWMATERIALS",
+          "FUND_ASSETCLASSES",
+          "INDEX_ASSETCLASSES",
+          "FUND_RATINGSCT"
+        ],
+        "composition": {
+          "compositionFields": [
+            "date",
+            "type",
+            "bbg",
+            "isin",
+            "name",
+            "weight",
+            "quantity",
+            "currency",
+            "sector",
+            "country",
+            "countryOfRisk"
+          ]
+        }
+      },
+      "response_structure": {
+        "products[].productId": "ISIN as product ID",
+        "products[].characteristics": "Dict of requested characteristic values",
+        "products[].currencies": "Dict with CURRENCY, BASE_CURRENCY, INDEX_CURRENCY",
+        "products[].metrics[]": "Array of {period, indicator, value}",
+        "products[].composition.totalNumberOfInstruments": "Total holdings count (153 for CW8)",
+        "products[].composition.compositionData[]": "Array of holdings with full details",
+        "products[].composition.compositionData[].compositionCharacteristics": {
+          "date": "Holdings date (2026-03-30)",
+          "isin": "Holding ISIN",
+          "name": "Holding name",
+          "bbg": "Bloomberg ticker (e.g. SAP GY)",
+          "weight": "Weight as decimal (0.0926 = 9.26%)",
+          "quantity": "Number of shares",
+          "currency": "Currency code",
+          "sector": "GICS sector name",
+          "type": "Instrument type (EQUITY_ORDINARY etc)",
+          "countryOfRisk": "Country of risk"
+        },
+        "products[].breakDowns[]": "Array of {aggregationField, breakDownData[]}"
+      },
+      "notes": [
+        "CW8 is swap-based so returns substitute basket (153 holdings), not MSCI World full constituents",
+        "breakDowns were empty for CW8 - may work for physical replication ETFs",
+        "Use productIds (not filters) to query specific ISINs - filters cause 400 errors",
+        "No authentication or API key required",
+        "Works on amundietf.fr domain (not amundietf.com which returns 404)"
+      ]
+    },
+    "2_product_page_url": {
+      "url": "POST https://www.amundietf.fr/mapi/PageContentAPI/getProductPageUrlByIdAndContext",
+      "description": "Get product page URL from ISIN",
+      "http_status": 200,
+      "request_payload": {
+        "productPageId": "LU1681043599",
+        "context": {
+          "countryCode": "FRA",
+          "languageCode": "fr",
+          "userProfileName": "INSTIT"
+        }
+      },
+      "response": "www.amundietf.fr/fr/professionnels/produits/equity/amundi-msci-world-swap-ucits-etf-eur-acc/lu1681043599"
+    },
+    "3_documents": {
+      "url": "POST https://www.amundietf.fr/mapi/DocumentAPI/document/getByProductIdsAndContext",
+      "description": "Get PDF documents (factsheets, KIIDs, prospectus) for an ETF",
+      "http_status": 200,
+      "request_payload": {
+        "productIds": [
+          "LU1681043599"
+        ],
+        "context": {
+          "countryCode": "FRA",
+          "languageCode": "fr",
+          "userProfileName": "INSTIT"
+        }
+      }
+    },
+    "4_all_products_listing": {
+      "url": "POST https://www.amundietf.fr/mapi/ProductAPI/getProductsData",
+      "description": "Get all Amundi ETFs (no productIds filter = returns ALL products)",
+      "request_payload": {
+        "characteristics": [
+          "ISIN"
+        ],
+        "metrics": [],
+        "context": {
+          "countryCode": "FRA",
+          "languageCode": "fr",
+          "userProfileName": "INSTIT"
+        },
+        "productType": "ALL"
+      }
+    },
+    "5_formatting_rules": {
+      "url": "GET https://www.amundietf.fr/mapi/ProductAPI/getFormattingRules",
+      "description": "Get formatting rules for display"
+    }
+  },
+  "failed_endpoints": {
+    "amundietf.com_patterns": "All returned 404 - site uses amundietf.fr (and other country domains)",
+    "api.amundietf.com": "DNS resolution failed - subdomain does not exist",
+    "gatsby_page_data": "404 - not a Gatsby site",
+    "filters_in_getProductsData": "400 Bad Request when using filters array; use productIds instead"
+  },
+  "context_values_by_country": {
+    "France": {
+      "domain": "www.amundietf.fr",
+      "countryCode": "FRA",
+      "languageCode": "fr",
+      "userProfileName": "INSTIT"
+    },
+    "note": "Other domains: amundietf.de, amundietf.it, amundietf.co.uk, amundietf.lu, amundietf.nl, amundietf.es, amundietf.se, amundietf.ch, amundietf.be, amundietf.dk, amundietf.fi, amundietf.no, amundietf.pl, amundietf.com.sg, amundietf.com.hk"
+  },
+  "api_base_urls": {
+    "ProductAPI": "/mapi/ProductAPI/",
+    "DocumentAPI": "/mapi/DocumentAPI/",
+    "PageContentAPI": "/mapi/PageContentAPI/",
+    "SearchAPI": "/mapi/SearchAPI/",
+    "ReferentialAPI": "/mapi/ReferentialAPI/",
+    "TranslateAPI": "/mapi/TranslateAPI/",
+    "WidgetAPI": "/mapi/WidgetAPI/",
+    "EducationAPI": "/mapi/EducationAPI/"
+  },
+  "widget_js_sources": {
+    "etf_finder": "https://amundiprodcdn2.azureedge.net/widgets-assets/etf-finder/20.1.12/amundi-etf-finder.js",
+    "product_page": "https://amundiprodcdn2.azureedge.net/widgets-assets/product-page/20.1.26/amundi-product-page.js",
+    "searchbar": "https://amundiprodcdn2.azureedge.net/widgets-assets/searchbar-widget/4.1.43/amundi-searchbar-widget.js"
+  },
+  "cw8_sample_data": {
+    "total_holdings": 153,
+    "holdings_with_isin": 152,
+    "holdings_with_sector": 151,
+    "holdings_with_country": 152,
+    "holdings_with_bbg_ticker": 151,
+    "total_weight_sum": "100.31%",
+    "as_of_date": "2026-03-30",
+    "top_3_holdings": [
+      {
+        "name": "SAP SE / XETRA",
+        "isin": "DE0007164600",
+        "weight_pct": 9.26,
+        "sector": "Information Technology",
+        "country": "Germany"
+      },
+      {
+        "name": "ASML HOLDING NV",
+        "isin": "NL0010273215",
+        "weight_pct": 8.45,
+        "sector": "Information Technology",
+        "country": "Netherlands"
+      },
+      {
+        "name": "AIRBUS SE",
+        "isin": "NL0000235190",
+        "weight_pct": 6.57,
+        "sector": "Industrials",
+        "country": "France"
+      }
+    ]
+  }
+}

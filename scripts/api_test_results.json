@@ -1,0 +1,492 @@
+{
+  "etfs_tested": [
+    "SWDA",
+    "CSPX",
+    "VWCE",
+    "VUSA",
+    "CW8",
+    "XDWD",
+    "EIMI",
+    "VHYL",
+    "MEUD",
+    "SPYD"
+  ],
+  "suffixes_tried": [
+    ".L",
+    ".DE",
+    ".PA",
+    ".AS"
+  ],
+  "results": [
+    {
+      "api": "finnhub",
+      "etf": "SWDA",
+      "isin": "IE00B4L5Y983",
+      "expected_holdings": 1400,
+      "ticker_tried": [
+        "SWDA.L",
+        "SWDA.DE",
+        "SWDA.PA",
+        "SWDA.AS",
+        "IE00B4L5Y983"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "SWDA",
+      "isin": "IE00B4L5Y983",
+      "expected_holdings": 1400,
+      "ticker_tried": [
+        "SWDA",
+        "SWDA.L",
+        "SWDA.DE",
+        "SWDA.PA",
+        "SWDA.AS"
+      ],
+      "best_ticker": "SWDA.L",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "SWDA.L",
+        "etf_name": "iShares Core MSCI World UCITS ETF",
+        "isin": "IE00B4L5Y983",
+        "cusip": "",
+        "country": "IE"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    },
+    {
+      "api": "finnhub",
+      "etf": "CSPX",
+      "isin": "IE00B5BMR087",
+      "expected_holdings": 503,
+      "ticker_tried": [
+        "CSPX.L",
+        "CSPX.DE",
+        "CSPX.PA",
+        "CSPX.AS",
+        "IE00B5BMR087"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "CSPX",
+      "isin": "IE00B5BMR087",
+      "expected_holdings": 503,
+      "ticker_tried": [
+        "CSPX",
+        "CSPX.L",
+        "CSPX.DE",
+        "CSPX.PA",
+        "CSPX.AS"
+      ],
+      "best_ticker": "CSPX.L",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "CSPX.L",
+        "etf_name": "iShares Core S&P 500 UCITS ETF",
+        "isin": "IE00B5BMR087",
+        "cusip": "",
+        "country": "IE"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    },
+    {
+      "api": "finnhub",
+      "etf": "VWCE",
+      "isin": "IE00BK5BQT80",
+      "expected_holdings": 3793,
+      "ticker_tried": [
+        "VWCE.L",
+        "VWCE.DE",
+        "VWCE.PA",
+        "VWCE.AS",
+        "IE00BK5BQT80"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "VWCE",
+      "isin": "IE00BK5BQT80",
+      "expected_holdings": 3793,
+      "ticker_tried": [
+        "VWCE",
+        "VWCE.L",
+        "VWCE.DE",
+        "VWCE.PA",
+        "VWCE.AS"
+      ],
+      "best_ticker": "VWCE.DE",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "VWCE.DE",
+        "etf_name": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating",
+        "isin": "IE00BK5BQT80",
+        "cusip": "G9T17Y653",
+        "country": "IE"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    },
+    {
+      "api": "finnhub",
+      "etf": "VUSA",
+      "isin": "IE00B3XXRP09",
+      "expected_holdings": 503,
+      "ticker_tried": [
+        "VUSA.L",
+        "VUSA.DE",
+        "VUSA.PA",
+        "VUSA.AS",
+        "IE00B3XXRP09"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "VUSA",
+      "isin": "IE00B3XXRP09",
+      "expected_holdings": 503,
+      "ticker_tried": [
+        "VUSA",
+        "VUSA.L",
+        "VUSA.DE",
+        "VUSA.PA",
+        "VUSA.AS"
+      ],
+      "best_ticker": "VUSA.L",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "VUSA.L",
+        "etf_name": "Vanguard S&P 500 UCITS ETF (USD) Distributing",
+        "isin": "IE00B3XXRP09",
+        "cusip": "G9T17W137",
+        "country": "IE"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    },
+    {
+      "api": "finnhub",
+      "etf": "CW8",
+      "isin": "LU1681043599",
+      "expected_holdings": 1400,
+      "ticker_tried": [
+        "CW8.L",
+        "CW8.DE",
+        "CW8.PA",
+        "CW8.AS",
+        "LU1681043599"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "CW8",
+      "isin": "LU1681043599",
+      "expected_holdings": 1400,
+      "ticker_tried": [
+        "CW8",
+        "CW8.L",
+        "CW8.DE",
+        "CW8.PA",
+        "CW8.AS"
+      ],
+      "best_ticker": "CW8.PA",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "CW8.PA",
+        "etf_name": "Amundi MSCI World Swap UCITS ETF EUR Acc",
+        "isin": "LU1681043599",
+        "cusip": "",
+        "country": "LU"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    },
+    {
+      "api": "finnhub",
+      "etf": "XDWD",
+      "isin": "IE00BK1PV551",
+      "expected_holdings": 1400,
+      "ticker_tried": [
+        "XDWD.L",
+        "XDWD.DE",
+        "XDWD.PA",
+        "XDWD.AS",
+        "IE00BK1PV551"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "XDWD",
+      "isin": "IE00BK1PV551",
+      "expected_holdings": 1400,
+      "ticker_tried": [
+        "XDWD",
+        "XDWD.L",
+        "XDWD.DE",
+        "XDWD.PA",
+        "XDWD.AS"
+      ],
+      "best_ticker": "XDWD.L",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "XDWD.L",
+        "etf_name": "Xtrackers MSCI World UCITS ETF 1C",
+        "isin": "IE00BJ0KDQ92",
+        "cusip": "",
+        "country": "IE"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    },
+    {
+      "api": "finnhub",
+      "etf": "EIMI",
+      "isin": "IE00BKM4GZ66",
+      "expected_holdings": 3000,
+      "ticker_tried": [
+        "EIMI.L",
+        "EIMI.DE",
+        "EIMI.PA",
+        "EIMI.AS",
+        "IE00BKM4GZ66"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "EIMI",
+      "isin": "IE00BKM4GZ66",
+      "expected_holdings": 3000,
+      "ticker_tried": [
+        "EIMI",
+        "EIMI.L",
+        "EIMI.DE",
+        "EIMI.PA",
+        "EIMI.AS"
+      ],
+      "best_ticker": "EIMI.L",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "EIMI.L",
+        "etf_name": "iShares Core MSCI EM IMI UCITS ETF",
+        "isin": "IE00BKM4GZ66",
+        "cusip": "",
+        "country": "IE"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    },
+    {
+      "api": "finnhub",
+      "etf": "VHYL",
+      "isin": "IE00B8GKDB10",
+      "expected_holdings": 1800,
+      "ticker_tried": [
+        "VHYL.L",
+        "VHYL.DE",
+        "VHYL.PA",
+        "VHYL.AS",
+        "IE00B8GKDB10"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "VHYL",
+      "isin": "IE00B8GKDB10",
+      "expected_holdings": 1800,
+      "ticker_tried": [
+        "VHYL",
+        "VHYL.L",
+        "VHYL.DE",
+        "VHYL.PA",
+        "VHYL.AS"
+      ],
+      "best_ticker": "VHYL.L",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "VHYL.L",
+        "etf_name": "Vanguard FTSE All-World High Dividend Yield UCITS ETF (USD) Distributing",
+        "isin": "IE00B8GKDB10",
+        "cusip": "G9T17W178",
+        "country": "IE"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    },
+    {
+      "api": "finnhub",
+      "etf": "MEUD",
+      "isin": "LU1089763773",
+      "expected_holdings": 600,
+      "ticker_tried": [
+        "MEUD.L",
+        "MEUD.DE",
+        "MEUD.PA",
+        "MEUD.AS",
+        "LU1089763773"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "MEUD",
+      "isin": "LU1089763773",
+      "expected_holdings": 600,
+      "ticker_tried": [
+        "MEUD",
+        "MEUD.L",
+        "MEUD.DE",
+        "MEUD.PA",
+        "MEUD.AS"
+      ],
+      "best_ticker": "MEUD.L",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "MEUD.L",
+        "etf_name": "Amundi Core Stoxx Europe 600 UCITS ETF Acc",
+        "isin": "LU0908500753",
+        "cusip": "",
+        "country": "LU"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    },
+    {
+      "api": "finnhub",
+      "etf": "SPYD",
+      "isin": "IE00B6YX5D40",
+      "expected_holdings": 80,
+      "ticker_tried": [
+        "SPYD.L",
+        "SPYD.DE",
+        "SPYD.PA",
+        "SPYD.AS",
+        "IE00B6YX5D40"
+      ],
+      "best_ticker": null,
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "error": "PREMIUM REQUIRED \u2014 ETF holdings endpoint needs paid plan"
+    },
+    {
+      "api": "api_ninjas",
+      "etf": "SPYD",
+      "isin": "IE00B6YX5D40",
+      "expected_holdings": 80,
+      "ticker_tried": [
+        "SPYD",
+        "SPYD.L",
+        "SPYD.DE",
+        "SPYD.PA",
+        "SPYD.AS"
+      ],
+      "best_ticker": "SPYD",
+      "holdings_returned": 0,
+      "coverage_pct": 0.0,
+      "has_isin": false,
+      "has_weight": false,
+      "etf_recognized": true,
+      "premium_required": true,
+      "ninjas_metadata": {
+        "etf_ticker": "SPYD",
+        "etf_name": "State Street SPDR Portfolio S&P 500 High Dividend ETF",
+        "isin": "US78468R7888",
+        "cusip": "78468R788",
+        "country": "US"
+      },
+      "error": "PREMIUM REQUIRED \u2014 holdings data needs paid plan"
+    }
+  ]
+}
