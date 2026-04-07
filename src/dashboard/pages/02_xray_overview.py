@@ -107,36 +107,32 @@ st.plotly_chart(fig, use_container_width=True)
 # ── Active Bets vs Benchmark ───────────────────────────────────────
 if active_share_result:
     st.subheader("Active Bets vs Benchmark")
-    col_over, col_under = st.columns(2)
 
     top_bets: pd.DataFrame = active_share_result["top_active_bets"]
     missed: pd.DataFrame = active_share_result["missed_exposures"]
 
-    with col_over:
-        st.markdown("**Top 10 Sovrappesi**")
-        if top_bets is not None and not top_bets.empty:
-            overweights = top_bets.nlargest(10, "overweight")[
-                ["name", "portfolio_weight", "benchmark_weight", "overweight"]
-            ].copy()
-            overweights.columns = ["Titolo", "Portafoglio %", "Benchmark %", "Delta %"]
-            for c in ["Portafoglio %", "Benchmark %", "Delta %"]:
-                overweights[c] = overweights[c].map(lambda x: f"{x:.2f}")
-            overweights = overweights.reset_index(drop=True)
-            overweights.index = overweights.index + 1
-            st.dataframe(overweights, use_container_width=True)
-        else:
-            st.info("Nessun sovrappeso rilevato.")
+    st.markdown("**Top 10 Sovrappesi**")
+    if top_bets is not None and not top_bets.empty:
+        overweights = top_bets.nlargest(10, "overweight")[
+            ["name", "portfolio_weight", "benchmark_weight", "overweight"]
+        ].copy()
+        overweights.columns = ["Titolo", "Portafoglio %", "Benchmark %", "Delta %"]
+        overweights["Portafoglio %"] = overweights["Portafoglio %"].map(lambda x: f"{x:.2f}")
+        overweights["Benchmark %"] = overweights["Benchmark %"].map(lambda x: f"{x:.2f}")
+        overweights["Delta %"] = overweights["Delta %"].map(lambda x: f"+{x:.2f}" if x >= 0 else f"{x:.2f}")
+        overweights = overweights.reset_index(drop=True)
+        st.dataframe(overweights, use_container_width=True, hide_index=True)
+    else:
+        st.info("Nessun sovrappeso rilevato.")
 
-    with col_under:
-        st.markdown("**Top 10 Sottopesi (assenti dal portafoglio)**")
-        if missed is not None and not missed.empty:
-            underweights = missed.nlargest(10, "benchmark_weight")[
-                ["name", "benchmark_weight"]
-            ].copy()
-            underweights.columns = ["Titolo", "Benchmark %"]
-            underweights["Benchmark %"] = underweights["Benchmark %"].map(lambda x: f"{x:.2f}")
-            underweights = underweights.reset_index(drop=True)
-            underweights.index = underweights.index + 1
-            st.dataframe(underweights, use_container_width=True)
-        else:
-            st.info("Nessun titolo benchmark significativo assente dal portafoglio.")
+    st.markdown("**Top 10 Sottopesi (assenti dal portafoglio)**")
+    if missed is not None and not missed.empty:
+        underweights = missed.nlargest(10, "benchmark_weight")[
+            ["name", "benchmark_weight"]
+        ].copy()
+        underweights.columns = ["Titolo", "Benchmark %"]
+        underweights["Benchmark %"] = underweights["Benchmark %"].map(lambda x: f"{x:.2f}")
+        underweights = underweights.reset_index(drop=True)
+        st.dataframe(underweights, use_container_width=True, hide_index=True)
+    else:
+        st.info("Nessun titolo benchmark significativo assente dal portafoglio.")
