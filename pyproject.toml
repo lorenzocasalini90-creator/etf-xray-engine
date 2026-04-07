@@ -20,6 +20,7 @@ dependencies = [
 dashboard = [
     "streamlit>=1.30",
     "plotly>=5.18",
+    "reportlab>=4.0",
 ]
 orchestration = [
     "prefect>=2.14",

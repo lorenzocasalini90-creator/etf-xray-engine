@@ -6,4 +6,5 @@ openpyxl>=3.1
 python-dotenv>=1.0
 streamlit>=1.30
 plotly>=5.18
+reportlab>=4.0
 justetf-scraping @ git+https://github.com/druzsan/justetf-scraping.git

@@ -63,6 +63,88 @@ k2.metric("HHI", f"{hhi_stats['hhi']:.4f}")
 k3.metric("Effective N", f"{hhi_stats['effective_n']:.0f}")
 k5.metric("Top-10 Conc.", f"{hhi_stats['top_10_pct']:.2f} %")
 
+# ── Export PDF ─────────────────────────────────────────────────────
+from datetime import datetime
+
+redundancy_df_export = st.session_state.get("redundancy_df")
+if redundancy_df_export is not None:
+    if st.button("📄 Esporta Report PDF"):
+        from src.dashboard.export.pdf_exporter import generate_report_pdf
+        from src.analytics.recommendations import generate_recommendations
+
+        positions = st.session_state.get("portfolio_positions", [])
+        total_eur = sum(p["capital"] for p in positions)
+
+        # Build xray_data
+        top_h = aggregated.nlargest(15, "real_weight_pct")
+        xray_data = {
+            "n_holdings": len(aggregated),
+            "hhi": hhi_stats["hhi"],
+            "effective_n": hhi_stats["effective_n"],
+            "active_share_pct": active_share_pct,
+            "top_10_pct": hhi_stats["top_10_pct"],
+            "top_holdings": [
+                {"name": r["name"], "ticker": r["ticker"],
+                 "weight": r["real_weight_pct"],
+                 "sector": r.get("sector", ""), "country": r.get("country", "")}
+                for _, r in top_h.iterrows()
+            ],
+        }
+
+        # Redundancy
+        red_list = redundancy_df_export.to_dict("records")
+
+        # Overlap
+        overlap_mat = st.session_state.get("overlap_matrix")
+        ol_data = overlap_mat.values.tolist() if overlap_mat is not None else None
+        ol_labels = overlap_mat.columns.tolist() if overlap_mat is not None else None
+
+        # Recommendations
+        red_scores = dict(zip(
+            redundancy_df_export["etf_ticker"],
+            redundancy_df_export["redundancy_pct"] / 100,
+        ))
+        ter_wasted = dict(zip(
+            redundancy_df_export["etf_ticker"],
+            redundancy_df_export["ter_wasted"],
+        ))
+        top1 = aggregated.nlargest(1, "real_weight_pct").iloc[0] if not aggregated.empty else None
+        bench_name = st.session_state.get("benchmark_name") or "mercato"
+        bench_labels_map = {"MSCI_WORLD": "MSCI World", "SP500": "S&P 500",
+                            "MSCI_EM": "MSCI EM", "FTSE_ALL_WORLD": "FTSE All-World"}
+        bench_display = bench_labels_map.get(bench_name, bench_name)
+
+        recs = generate_recommendations(
+            redundancy_scores=red_scores,
+            ter_wasted_eur=ter_wasted,
+            active_share=active_share_pct,
+            hhi=hhi_stats["hhi"],
+            top1_weight=(top1["real_weight_pct"] / 100) if top1 is not None else 0,
+            top1_name=top1["name"] if top1 is not None else "",
+            n_etf=len(positions),
+            portfolio_total_eur=total_eur,
+            benchmark_name=bench_display,
+        )
+
+        with st.spinner("Generazione report PDF..."):
+            pdf_bytes = generate_report_pdf(
+                portfolio=positions,
+                benchmark_name=bench_display if bench_name else None,
+                xray_data=xray_data,
+                redundancy_data=red_list,
+                overlap_data=ol_data,
+                overlap_labels=ol_labels,
+                recommendations=recs,
+                factor_data=st.session_state.get("factor_result"),
+            )
+
+        st.download_button(
+            label="⬇️ Scarica Report PDF",
+            data=pdf_bytes,
+            file_name=f"xray_report_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+        )
+
 # ── KPI explanations ───────────────────────────────────────────────
 with st.expander("ℹ️ Cos'è HHI (Indice di Concentrazione)?"):
     st.markdown(

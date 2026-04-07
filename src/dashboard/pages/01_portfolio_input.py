@@ -29,6 +29,7 @@ _DEFAULTS: dict = {
     "analysis_timestamp": None,
     "display_names": {},
     "editing_etf_idx": None,
+    "last_analyzed_portfolio": None,
 }
 for _key, _default in _DEFAULTS.items():
     if _key not in st.session_state:
@@ -154,7 +155,20 @@ with tab_upload:
 positions: list[dict] = st.session_state.portfolio_positions
 
 if not positions:
-    st.info("Aggiungi almeno un ETF per iniziare.")
+    last = st.session_state.get("last_analyzed_portfolio")
+    if last:
+        st.info(
+            f"📂 **Ultima analisi:** {last['n_etf']} ETF · "
+            f"€{last['total_eur']:,.0f} · "
+            f"ore {last['analyzed_at']}"
+        )
+        if st.button("↩ Ricarica portafoglio precedente"):
+            st.session_state.portfolio_positions = last["positions"]
+            if last.get("benchmark"):
+                st.session_state.benchmark_name = last["benchmark"]
+            st.rerun()
+    else:
+        st.info("Aggiungi almeno un ETF per iniziare.")
     st.stop()
 
 st.subheader("Portafoglio attuale")
@@ -215,6 +229,51 @@ for idx, pos in enumerate(positions):
 
 total_capital = sum(p["capital"] for p in positions)
 st.caption(f"Totale investito: **€ {total_capital:,.0f}**")
+
+# ── Save / Load portfolio ──────────────────────────────────────────
+from src.dashboard.components.portfolio_persistence import (
+    serialize_portfolio,
+    deserialize_portfolio,
+    generate_portfolio_filename,
+)
+
+col_save, col_load = st.columns(2)
+
+with col_save:
+    json_str = serialize_portfolio(positions, benchmark=st.session_state.benchmark_name)
+    filename = generate_portfolio_filename(positions)
+    st.download_button(
+        label="💾 Salva portafoglio",
+        data=json_str,
+        file_name=filename,
+        mime="application/json",
+    )
+
+with col_load:
+    json_file = st.file_uploader(
+        "📂 Carica portafoglio salvato",
+        type=["json"],
+        key="portfolio_json_loader",
+        label_visibility="collapsed",
+    )
+    if json_file is not None:
+        try:
+            content = json_file.read().decode("utf-8")
+            loaded_positions, loaded_bench, load_warnings = deserialize_portfolio(content)
+            for w in load_warnings:
+                st.warning(w)
+            st.session_state.portfolio_positions = loaded_positions
+            if loaded_bench:
+                st.session_state.benchmark_name = loaded_bench
+            for key in ("aggregated", "overlap_matrix", "redundancy_df",
+                         "factor_result", "active_share_result", "benchmark_df",
+                         "analysis_hash", "analysis_timestamp"):
+                st.session_state[key] = None
+            st.session_state.holdings_db = {}
+            st.session_state.display_names = {}
+            st.rerun()
+        except ValueError as exc:
+            st.error(str(exc))
 
 # ── Benchmark selector ──────────────────────────────────────────────
 st.divider()
@@ -397,6 +456,15 @@ if run_analysis:
     # Save cache hash and timestamp
     st.session_state.analysis_hash = current_hash
     st.session_state.analysis_timestamp = time.time()
+
+    # Save last analyzed portfolio for recovery
+    st.session_state.last_analyzed_portfolio = {
+        "positions": [dict(p) for p in positions],
+        "n_etf": len(positions),
+        "total_eur": total_capital,
+        "analyzed_at": time.strftime("%H:%M"),
+        "benchmark": st.session_state.benchmark_name,
+    }
 
     status_container.update(state="complete", expanded=False)
     st.success("✅ Analisi completata! Naviga alle altre pagine per esplorare i risultati.")
