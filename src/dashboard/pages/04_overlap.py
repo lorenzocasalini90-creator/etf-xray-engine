@@ -12,6 +12,10 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 st.header("🔥 Overlap Heatmap")
+from src.dashboard.components.global_header import show_global_header
+show_global_header()
+from src.dashboard.components.observations_box import show_observations
+show_observations(st.session_state.get("observations", []), "overlap")
 
 overlap_mat = st.session_state.get("overlap_matrix")
 holdings_db: dict = st.session_state.get("holdings_db", {})
@@ -143,3 +147,7 @@ if len(tickers_all) >= 2:
             st.dataframe(display_detail, use_container_width=True, hide_index=True)
 else:
     st.info("Servono almeno 2 ETF per l'analisi di esposizione unica.")
+
+# ── Footer ─────────────────────────────────────────────────────────
+from src.dashboard.components.footer import show_footer
+show_footer()

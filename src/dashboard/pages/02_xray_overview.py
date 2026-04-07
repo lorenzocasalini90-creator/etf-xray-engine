@@ -12,6 +12,10 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 st.header("🔍 X-Ray Overview")
+from src.dashboard.components.global_header import show_global_header
+show_global_header()
+from src.dashboard.components.observations_box import show_observations
+show_observations(st.session_state.get("observations", []), "xray")
 
 aggregated = st.session_state.get("aggregated")
 if aggregated is None:
@@ -53,15 +57,17 @@ hhi_stats = portfolio_hhi(aggregated)
 active_share_result = st.session_state.get("active_share_result")
 active_share_pct = active_share_result["active_share_pct"] if active_share_result else None
 
-if active_share_pct is not None:
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k4.metric("Active Share", f"{active_share_pct:.1f} %")
-else:
-    k1, k2, k3, k5 = st.columns(4)
-k1.metric("Titoli unici", f"{len(aggregated):,}")
-k2.metric("HHI", f"{hhi_stats['hhi']:.4f}")
-k3.metric("Effective N", f"{hhi_stats['effective_n']:.0f}")
-k5.metric("Top-10 Conc.", f"{hhi_stats['top_10_pct']:.2f} %")
+from src.dashboard.components.kpi_card import (
+    render_active_share_card, render_effective_n_card,
+    render_hhi_card, render_top10_card,
+)
+
+k1, k2, k3, k4, k5 = st.columns(5)
+k1.metric("Titoli unici", f"{len(aggregated):,}", help="Numero totale di titoli unici nel portafoglio aggregato.")
+render_hhi_card(hhi_stats["hhi"], k2)
+render_effective_n_card(hhi_stats["effective_n"], k3)
+render_active_share_card(active_share_pct, k4)
+render_top10_card(hhi_stats["top_10_pct"], k5)
 
 # ── Export PDF ─────────────────────────────────────────────────────
 from datetime import datetime
@@ -144,41 +150,6 @@ if redundancy_df_export is not None:
             file_name=f"xray_report_{datetime.now().strftime('%Y%m%d')}.pdf",
             mime="application/pdf",
         )
-
-# ── KPI explanations ───────────────────────────────────────────────
-with st.expander("ℹ️ Cos'è HHI (Indice di Concentrazione)?"):
-    st.markdown(
-        "Misura quanto il tuo portafoglio dipende da pochi titoli. "
-        "Più è basso, meglio è.\n\n"
-        "- **Sotto 0.05** = ben diversificato\n"
-        "- **Sopra 0.15** = troppo concentrato\n\n"
-        "Se i tuoi top titoli crollano, un HHI alto significa che il tuo portafoglio "
-        "ne risente pesantemente."
-    )
-
-with st.expander("ℹ️ Cos'è Effective N?"):
-    st.markdown(
-        "Il numero equivalente di titoli nel tuo portafoglio se fossero tutti con lo stesso peso. "
-        "Hai 500 titoli ma Effective N è 30? Significa che il portafoglio è dominato da pochi nomi "
-        "— si comporta come se ne avessi solo 30."
-    )
-
-if active_share_pct is not None:
-    with st.expander("ℹ️ Cos'è Active Share?"):
-        st.markdown(
-            "Quanto il tuo portafoglio è diverso dal benchmark (es. MSCI World).\n\n"
-            "- **0%** = identico al mercato\n"
-            "- **100%** = completamente diverso\n\n"
-            "- **Sotto 20%** = stai pagando più TER per replicare essenzialmente un indice\n"
-            "- **Sopra 60%** = portafoglio molto diverso dal mercato, "
-            "con rischi e opportunità specifiche"
-        )
-
-with st.expander("ℹ️ Cos'è Top-10 Concentration?"):
-    st.markdown(
-        "La somma dei pesi dei tuoi 10 titoli più grandi. "
-        "Se è 35%, un terzo del tuo portafoglio dipende da 10 aziende."
-    )
 
 # ── Top 30 holdings table ──────────────────────────────────────────
 st.subheader("Top 30 titoli per peso reale")
@@ -371,3 +342,7 @@ if redundancy_df is not None and not redundancy_df.empty:
                 "quantitativa del portafoglio. Non costituiscono consulenza "
                 "finanziaria. Consulta un professionista per decisioni di investimento."
             )
+
+# ── Footer ─────────────────────────────────────────────────────────
+from src.dashboard.components.footer import show_footer
+show_footer()

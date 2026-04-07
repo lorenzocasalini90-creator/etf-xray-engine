@@ -12,6 +12,10 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 st.header("🧬 Factor Fingerprint")
+from src.dashboard.components.global_header import show_global_header
+show_global_header()
+from src.dashboard.components.observations_box import show_observations
+show_observations(st.session_state.get("observations", []), "factor")
 
 aggregated = st.session_state.get("aggregated")
 if aggregated is None:
@@ -65,8 +69,6 @@ drivers = factor_result.get("factor_drivers", {})
 bench_cmp = factor_result.get("benchmark_comparison")
 
 # ── Radar chart ─────────────────────────────────────────────────────
-st.subheader("Radar — profilo fattoriale")
-
 # Normalize scores to 0-100 for radar
 size_score = scores["size"].get("Large", 0)
 vg = scores["value_growth"]
@@ -79,6 +81,42 @@ div_raw = scores["dividend_yield"].get("weighted_yield", 0) or 0
 # yfinance returns dividend yield as decimal (0.015 = 1.5%) — convert to percentage
 div_yield = div_raw * 100 if div_raw < 1 else div_raw
 div_score = min(100, div_yield * 20)  # 2% yield → score 40
+
+# Factor tilt summary badges
+_pe_val = vg.get("weighted_pe")
+_roe_raw = scores["quality"].get("weighted_roe", 0) or 0
+_roe_pct = _roe_raw * 100 if _roe_raw < 1 else _roe_raw
+_large_pct = scores["size"].get("Large", 0)
+_dy_raw = scores["dividend_yield"].get("weighted_yield", 0) or 0
+_dy_pct = _dy_raw * 100 if _dy_raw < 1 else _dy_raw
+
+_tilts = []
+if _pe_val and _pe_val > 25:
+    _tilts.append("Growth tilt 🟣")
+elif _pe_val and _pe_val < 15:
+    _tilts.append("Value tilt 🟣")
+if _large_pct > 70:
+    _tilts.append(f"Large-cap {_large_pct:.0f}%")
+if _roe_pct > 20:
+    _tilts.append("Quality sopra media")
+if _dy_pct < 1.5:
+    _tilts.append("Div yield basso")
+elif _dy_pct > 3:
+    _tilts.append("Income oriented")
+
+if _tilts:
+    st.markdown(
+        " &nbsp;·&nbsp; ".join(
+            f"<span style='background:#ede9fe; color:#5b21b6;"
+            f"padding:2px 8px; border-radius:12px;"
+            f"font-size:0.8rem; font-weight:500;'>{t}</span>"
+            for t in _tilts
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown("")
+
+st.subheader("Radar — profilo fattoriale")
 
 dimensions = ["Size (Large Cap)", "Value", "Quality", "Dividend Yield"]
 portfolio_vals = [size_score, pe_score, quality_roe, div_score]
@@ -206,3 +244,7 @@ for label, key in driver_tabs.items():
     with st.expander(f"🔎 {label} — top 5 driver"):
         drv_df = pd.DataFrame(drv[:5])
         st.dataframe(drv_df, use_container_width=True, hide_index=True)
+
+# ── Footer ─────────────────────────────────────────────────────────
+from src.dashboard.components.footer import show_footer
+show_footer()

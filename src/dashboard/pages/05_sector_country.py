@@ -12,6 +12,10 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 st.header("🌍 Sector & Country")
+from src.dashboard.components.global_header import show_global_header
+show_global_header()
+from src.dashboard.components.observations_box import show_observations
+show_observations(st.session_state.get("observations", []), "sector")
 
 aggregated = st.session_state.get("aggregated")
 if aggregated is None:
@@ -143,3 +147,7 @@ fig_sun = px.sunburst(
 )
 fig_sun.update_layout(height=600)
 st.plotly_chart(fig_sun, use_container_width=True)
+
+# ── Footer ─────────────────────────────────────────────────────────
+from src.dashboard.components.footer import show_footer
+show_footer()

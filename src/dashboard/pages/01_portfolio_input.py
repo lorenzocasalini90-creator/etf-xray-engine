@@ -36,6 +36,8 @@ for _key, _default in _DEFAULTS.items():
         st.session_state[_key] = _default
 
 st.header("📥 Portfolio Input")
+from src.dashboard.components.global_header import show_global_header
+show_global_header()
 
 tab_manual, tab_upload = st.tabs(["📋 Inserisci manualmente", "📤 Carica da file"])
 
@@ -452,6 +454,56 @@ if run_analysis:
     else:
         st.session_state.benchmark_df = None
         st.session_state.active_share_result = None
+
+    # Generate observations for all pages
+    from src.analytics.observations import generate_observations
+    from src.analytics.aggregator import country_exposure
+
+    country_df_obs = country_exposure(aggregated)
+    us_w = 0.0
+    if not country_df_obs.empty:
+        us_row = country_df_obs[country_df_obs["country"].str.contains("United States", case=False, na=False)]
+        us_w = us_row["weight_pct"].sum() if not us_row.empty else 0.0
+
+    red_df_obs = st.session_state.get("redundancy_df")
+    red_scores_obs = {}
+    ter_wasted_obs = {}
+    if red_df_obs is not None and not red_df_obs.empty:
+        red_scores_obs = dict(zip(red_df_obs["etf_ticker"], red_df_obs["redundancy_pct"] / 100))
+        ter_wasted_obs = dict(zip(red_df_obs["etf_ticker"], red_df_obs["ter_wasted"].fillna(0)))
+
+    overlap_mat_obs = st.session_state.get("overlap_matrix")
+    overlap_pairs_obs = []
+    if overlap_mat_obs is not None:
+        ol_labels = overlap_mat_obs.columns.tolist()
+        for i_o in range(len(ol_labels)):
+            for j_o in range(i_o + 1, len(ol_labels)):
+                overlap_pairs_obs.append((ol_labels[i_o], ol_labels[j_o], overlap_mat_obs.iloc[i_o, j_o]))
+
+    top1_obs = aggregated.nlargest(1, "real_weight_pct").iloc[0] if not aggregated.empty else None
+    bench_labels_obs = {"MSCI_WORLD": "MSCI World", "SP500": "S&P 500",
+                        "MSCI_EM": "MSCI EM", "FTSE_ALL_WORLD": "FTSE All-World"}
+    bench_display_obs = bench_labels_obs.get(st.session_state.benchmark_name or "", "mercato")
+
+    as_result_obs = st.session_state.get("active_share_result")
+    as_pct_obs = as_result_obs["active_share_pct"] if as_result_obs else None
+
+    from src.analytics.overlap import portfolio_hhi as hhi_fn
+    hhi_stats_obs = hhi_fn(aggregated)
+
+    st.session_state.observations = generate_observations(
+        hhi=hhi_stats_obs["hhi"],
+        effective_n=hhi_stats_obs["effective_n"],
+        active_share=as_pct_obs,
+        top10_weight=hhi_stats_obs["top_10_pct"],
+        top1_name=top1_obs["name"] if top1_obs is not None else "",
+        top1_weight=(top1_obs["real_weight_pct"] / 100) if top1_obs is not None else 0,
+        redundancy_scores=red_scores_obs,
+        ter_wasted_eur=ter_wasted_obs,
+        overlap_pairs=overlap_pairs_obs,
+        us_weight=us_w,
+        benchmark_name=bench_display_obs,
+    )
 
     # Save cache hash and timestamp
     st.session_state.analysis_hash = current_hash

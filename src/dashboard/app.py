@@ -9,6 +9,15 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+import os
+
+def _load_css():
+    css_path = os.path.join(os.path.dirname(__file__), "styles", "global.css")
+    with open(css_path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+_load_css()
+
 # ── Session state defaults ──────────────────────────────────────────
 _DEFAULTS: dict = {
     "portfolio_positions": [],   # [{"ticker": str, "capital": float}, ...]

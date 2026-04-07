@@ -12,6 +12,10 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 st.header("♻️ ETF Redundancy")
+from src.dashboard.components.global_header import show_global_header
+show_global_header()
+from src.dashboard.components.observations_box import show_observations
+show_observations(st.session_state.get("observations", []), "redundancy")
 
 redundancy_df = st.session_state.get("redundancy_df")
 if redundancy_df is None:
@@ -25,6 +29,34 @@ if 'real_weight_pct' in redundancy_df.columns:
     redundancy_df['real_weight_pct'] = pd.to_numeric(redundancy_df['real_weight_pct'], errors='coerce').fillna(0.0)
 
 # ── Horizontal bar chart ────────────────────────────────────────────
+from src.dashboard.styles.colors import GREEN_LIGHT, RED_LIGHT, YELLOW_LIGHT
+
+# Summary box
+_red_scores = dict(zip(redundancy_df["etf_ticker"], redundancy_df["redundancy_pct"] / 100))
+_ter_wasted_all = dict(zip(redundancy_df["etf_ticker"], redundancy_df["ter_wasted"].fillna(0)))
+_total_ter_wasted = sum(_ter_wasted_all.values())
+_max_redundant = max(_red_scores, key=_red_scores.get) if _red_scores else ""
+_max_r = _red_scores.get(_max_redundant, 0)
+
+_level = "ALTA 🔴" if _max_r > 0.70 else ("MODERATA 🟡" if _max_r > 0.40 else "BASSA 🟢")
+_color = RED_LIGHT if _max_r > 0.70 else (YELLOW_LIGHT if _max_r > 0.40 else GREEN_LIGHT)
+
+st.markdown(
+    f"""<div style='background:{_color}; border-radius:8px;
+    padding:16px 20px; margin-bottom:20px;'>
+    <div style='font-size:0.78rem; font-weight:600; color:#374151;
+    text-transform:uppercase; letter-spacing:0.04em;'>
+    Livello ridondanza portafoglio</div>
+    <div style='font-size:1.4rem; font-weight:700; margin:4px 0;'>
+    {_level}</div>
+    <div style='font-size:0.88rem; color:#374151;'>
+    TER inefficienza stimata: <strong>€{_total_ter_wasted:.0f}/anno</strong>
+    &nbsp;|&nbsp;
+    ETF più ridondante: <strong>{_max_redundant} ({_max_r*100:.0f}%)</strong>
+    </div></div>""",
+    unsafe_allow_html=True,
+)
+
 color_map = {"green": "#2ecc71", "yellow": "#f39c12", "red": "#e74c3c"}
 colors = redundancy_df["verdict"].map(color_map).tolist()
 
@@ -85,3 +117,7 @@ per risparmiare sul TER e semplificare il portafoglio.
 """
 )
 st.info("💡 Suggerimenti basati su questi dati disponibili nella pagina **X-Ray Overview**")
+
+# ── Footer ─────────────────────────────────────────────────────────
+from src.dashboard.components.footer import show_footer
+show_footer()
