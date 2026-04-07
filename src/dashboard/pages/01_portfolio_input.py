@@ -27,6 +27,7 @@ _DEFAULTS: dict = {
     "active_share_result": None,
     "analysis_hash": None,
     "analysis_timestamp": None,
+    "display_names": {},
 }
 for _key, _default in _DEFAULTS.items():
     if _key not in st.session_state:
@@ -72,7 +73,8 @@ st.subheader("Portafoglio attuale")
 
 for idx, pos in enumerate(positions):
     col_t, col_c, col_r = st.columns([3, 2, 1])
-    col_t.write(f"**{pos['ticker']}**")
+    display = st.session_state.get("display_names", {}).get(pos["ticker"], pos["ticker"])
+    col_t.write(f"**{display}**")
     col_c.write(f"€ {pos['capital']:,.0f}")
     if col_r.button("🗑️", key=f"rm_{idx}"):
         st.session_state.portfolio_positions.pop(idx)
@@ -107,15 +109,26 @@ st.caption("Il benchmark serve per confrontare il tuo portafoglio con il mercato
 # ── Analyse button ──────────────────────────────────────────────────
 st.divider()
 
-force_refresh = st.checkbox("🔄 Forza aggiornamento (ignora cache)", value=False)
-
 def _portfolio_hash(positions: list[dict], benchmark_name: str | None) -> str:
     """Compute a deterministic hash of the portfolio composition."""
     key_parts = sorted(f"{p['ticker']}:{p['capital']}" for p in positions)
     key_parts.append(f"bench:{benchmark_name}")
     return hashlib.sha256("|".join(key_parts).encode()).hexdigest()[:16]
 
-if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=True):
+col_main, col_refresh = st.columns([3, 1])
+run_analysis = False
+force_refresh = False
+
+with col_main:
+    if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=True):
+        run_analysis = True
+
+with col_refresh:
+    if st.button("↺ Aggiorna dati", use_container_width=True):
+        run_analysis = True
+        force_refresh = True
+
+if run_analysis:
     # Check aggregation cache
     current_hash = _portfolio_hash(positions, st.session_state.benchmark_name)
     cached_hash = st.session_state.get("analysis_hash")
@@ -130,7 +143,7 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
         elapsed_min = (time.time() - cached_time) / 60
         st.info(
             f"Usando risultati in cache (analizzato {elapsed_min:.0f} minuti fa). "
-            "Checka 'Forza aggiornamento' per aggiornare."
+            "Premi '↺ Aggiorna dati' per forzare il ricalcolo."
         )
         st.stop()
 
@@ -167,7 +180,8 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
             result = orchestrator.fetch(ticker, force_refresh=force_refresh)
 
             if result.status == "cached":
-                status_container.write(f"⚡ {ticker} {step} — cache ({result.message})")
+                n_h = len(result.holdings) if result.holdings is not None else 0
+                status_container.write(f"⚡ {ticker} {step} — {n_h} holdings dalla cache")
             elif result.status == "success":
                 n_h = len(result.holdings) if result.holdings is not None else 0
                 status_container.write(f"✅ {ticker} {step} — {n_h} holdings da {result.source}")
@@ -184,6 +198,26 @@ if st.button("🚀 Analizza Portafoglio", type="primary", use_container_width=Tr
 
     status_container.update(label=f"Aggregazione…")
     st.session_state.holdings_db = holdings_db
+
+    # Resolve display names for ISINs
+    display_names: dict[str, str] = st.session_state.get("display_names", {})
+    for pos in positions:
+        input_id = pos["ticker"]
+        if input_id in display_names and not force_refresh:
+            continue
+        if input_id in holdings_db:
+            df = holdings_db[input_id]
+            if "etf_ticker" in df.columns:
+                resolved = df["etf_ticker"].dropna().unique()
+                if len(resolved) > 0 and resolved[0] != input_id:
+                    display_names[input_id] = resolved[0]
+                    continue
+        # ISIN truncation fallback
+        if len(input_id) == 12 and input_id[:2].isalpha():
+            display_names[input_id] = f"{input_id[:7]}…{input_id[-2:]}"
+        else:
+            display_names[input_id] = input_id
+    st.session_state.display_names = display_names
 
     # Aggregate
     try:

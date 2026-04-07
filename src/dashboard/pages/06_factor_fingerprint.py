@@ -38,12 +38,22 @@ if factor_result is None:
         engine = FactorEngine(session)
         benchmark_df = st.session_state.get("benchmark_df")
 
-        with st.spinner("Calcolo fattori in corso (può richiedere qualche minuto per dati yfinance)…"):
-            factor_result = engine.analyze(
-                aggregated,
-                benchmark_df=benchmark_df if benchmark_df is not None else None,
-            )
-            st.session_state.factor_result = factor_result
+        st.info("⏱ Tempo stimato: 20-40 secondi — "
+                "i dati fondamentali vengono scaricati da yfinance")
+
+        progress_bar = st.progress(0, text="Inizializzazione factor engine…")
+
+        def _update_progress(pct: float, msg: str) -> None:
+            progress_bar.progress(pct, text=msg)
+
+        factor_result = engine.analyze(
+            aggregated,
+            benchmark_df=benchmark_df if benchmark_df is not None else None,
+            progress_callback=_update_progress,
+        )
+        st.session_state.factor_result = factor_result
+
+        progress_bar.progress(1.0, text="✅ Factor Fingerprint completato")
         st.rerun()
     else:
         st.info("Clicca il bottone per lanciare l'analisi fattoriale (richiede fetch dati da yfinance).")
@@ -109,7 +119,8 @@ fig_radar.update_layout(
     height=500,
 )
 st.plotly_chart(fig_radar, use_container_width=True)
-st.caption("Nota: il fattore Momentum sarà disponibile in una versione futura.")
+st.caption("* Momentum non disponibile — richiede serie storiche prezzi 6-12 mesi. "
+           "Sarà implementato prossimamente.")
 
 with st.expander("ℹ️ Cos'è il Factor Fingerprint?"):
     st.markdown(
@@ -135,6 +146,7 @@ row_base = [
     ("Value (P/B medio)", f"{vg.get('weighted_pb', 'N/A')}", f"{bench_cmp['value_growth'].get('pb_delta', 'N/A')}" if has_bench else None),
     ("Quality (ROE %)", f"{roe_val:.1f}%", f"{bench_cmp['quality'].get('roe_delta', 'N/A')}" if has_bench else None),
     ("Dividend Yield %", f"{div_yield:.2f}%", f"{bench_cmp['dividend_yield'].get('yield_delta', 'N/A')}" if has_bench else None),
+    ("Momentum *", "N/D", "N/D" if has_bench else None),
 ]
 for dim, port, delta in row_base:
     row = {"Dimensione": dim, "Portafoglio": port}

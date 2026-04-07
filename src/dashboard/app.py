@@ -20,6 +20,7 @@ _DEFAULTS: dict = {
     "redundancy_df": None,
     "factor_result": None,
     "active_share_result": None,
+    "display_names": {},
 }
 
 for key, default in _DEFAULTS.items():
@@ -34,7 +35,11 @@ with st.sidebar:
 
     n_etf = len(st.session_state.portfolio_positions)
     if n_etf:
-        tickers = ", ".join(p["ticker"] for p in st.session_state.portfolio_positions)
+        display_names = st.session_state.get("display_names", {})
+        tickers = ", ".join(
+            display_names.get(p["ticker"], p["ticker"])
+            for p in st.session_state.portfolio_positions
+        )
         st.success(f"**{n_etf} ETF** in portafoglio: {tickers}")
     else:
         st.info("Nessun ETF caricato — vai a **Portfolio Input**")

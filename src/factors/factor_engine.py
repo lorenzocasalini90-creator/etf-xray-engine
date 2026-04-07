@@ -11,6 +11,10 @@ from dataclasses import dataclass, field
 import pandas as pd
 from sqlalchemy.orm import Session
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 from src.factors.fundamentals import FundamentalsProvider
 from src.factors.sector_proxies import GICS_SECTOR_MEDIANS, get_sector_proxy
 
@@ -376,6 +380,7 @@ class FactorEngine:
         self,
         portfolio_df: pd.DataFrame,
         benchmark_df: pd.DataFrame | None = None,
+        progress_callback: "Callable[[float, str], None] | None" = None,
     ) -> dict:
         """Run full factor analysis on a portfolio.
 
@@ -391,8 +396,17 @@ class FactorEngine:
                 - coverage_report: L1/L2/L3/L4 breakdown
                 - factor_drivers: top holdings per factor
         """
+        def _progress(pct: float, msg: str) -> None:
+            if progress_callback:
+                progress_callback(pct, msg)
+
+        _progress(0.05, "Carico dati fondamentali (P/E, P/B, ROE)…")
         resolved, coverage = self._resolve_fundamentals(portfolio_df)
+
+        _progress(0.45, "Classifico titoli per Size e Value/Growth…")
         factor_scores = self._compute_weighted_factors(resolved)
+
+        _progress(0.55, "Identifico factor drivers…")
         factor_drivers = self._find_factor_drivers(resolved)
 
         result = {
@@ -403,6 +417,7 @@ class FactorEngine:
         }
 
         if benchmark_df is not None and not benchmark_df.empty:
+            _progress(0.65, "Analizzo benchmark…")
             # Benchmark DataFrames use 'weight_pct'; normalize to 'real_weight_pct'
             if "real_weight_pct" not in benchmark_df.columns and "weight_pct" in benchmark_df.columns:
                 benchmark_df = benchmark_df.copy()
@@ -410,11 +425,14 @@ class FactorEngine:
                     benchmark_df["weight_pct"], errors="coerce"
                 ).fillna(0.0)
             bench_resolved, _ = self._resolve_fundamentals(benchmark_df)
+
+            _progress(0.85, "Calcolo delta vs benchmark…")
             bench_factors = self._compute_weighted_factors(bench_resolved)
             result["benchmark_comparison"] = self._compute_delta(
                 factor_scores, bench_factors,
             )
 
+        _progress(1.0, "Completato")
         return result
 
     def _compute_delta(self, portfolio: dict, benchmark: dict) -> dict:
