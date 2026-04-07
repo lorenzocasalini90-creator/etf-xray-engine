@@ -84,3 +84,62 @@ if len(tickers) >= 2:
             st.dataframe(display, use_container_width=True)
     elif etf_a == etf_b:
         st.warning("Seleziona due ETF diversi.")
+
+# ── Unique exposure analysis ───────────────────────────────────────
+from src.analytics.overlap import compute_unique_exposure
+
+st.subheader("🔍 Analisi: cosa perdi rimuovendo un ETF?")
+tickers_all = list(holdings_db.keys())
+
+if len(tickers_all) >= 2:
+    target = st.selectbox(
+        "Seleziona ETF da analizzare",
+        tickers_all,
+        key="unique_exposure_target",
+    )
+
+    if target:
+        ue = compute_unique_exposure(target, holdings_db)
+
+        unique_pct = ue["total_unique_pct"]
+        unique_count = ue["unique_holdings_count"]
+        total_h = ue["total_holdings"]
+        main_etf = ue["main_covering_etf"]
+
+        if unique_pct < 5:
+            st.success(
+                f"Rimuovendo **{target}**: impatto minimo — "
+                f"{target} è ampiamente ridondante. Rimozione suggerita.\n\n"
+                f"• Esposizione unica: **{unique_pct:.1f}%** su {unique_count} titoli\n"
+                f"• La maggior parte già coperta da: **{main_etf}**"
+            )
+        elif unique_pct < 15:
+            st.warning(
+                f"Rimuovendo **{target}**: impatto moderato — "
+                f"valuta se l'esposizione unica giustifica il TER.\n\n"
+                f"• Esposizione unica: **{unique_pct:.1f}%** su {unique_count} titoli\n"
+                f"• La maggior parte già coperta da: **{main_etf}**"
+            )
+        else:
+            st.error(
+                f"Rimuovendo **{target}**: impatto significativo — "
+                f"{target} contribuisce esposizione difficilmente sostituibile.\n\n"
+                f"• Esposizione unica: **{unique_pct:.1f}%** su {unique_count} titoli\n"
+                f"• La maggior parte già coperta da: **{main_etf}**"
+            )
+
+        detail = ue["holdings_detail"]
+        if not detail.empty:
+            display_detail = detail.head(20)[
+                ["holding_name", "weight_in_target_pct", "covered_weight_pct",
+                 "unique_weight_pct", "covered_by_etf"]
+            ].copy()
+            display_detail.columns = [
+                "Titolo", f"Peso in {target} %", "Coperto da altri %",
+                "Unico %", "Coperto da",
+            ]
+            for c in [f"Peso in {target} %", "Coperto da altri %", "Unico %"]:
+                display_detail[c] = display_detail[c].map(lambda x: f"{x:.2f}")
+            st.dataframe(display_detail, use_container_width=True, hide_index=True)
+else:
+    st.info("Servono almeno 2 ETF per l'analisi di esposizione unica.")

@@ -84,3 +84,4 @@ st.markdown(
 per risparmiare sul TER e semplificare il portafoglio.
 """
 )
+st.info("💡 Suggerimenti basati su questi dati disponibili nella pagina **X-Ray Overview**")

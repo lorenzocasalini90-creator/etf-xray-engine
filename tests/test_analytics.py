@@ -257,3 +257,52 @@ class TestActiveShare:
         result = active_share(port, etf_gamma)
         missed = result["missed_exposures"]
         assert len(missed) == 3  # All 3 Gamma holdings are missed
+
+
+class TestUniqueExposure:
+    """Tests for compute_unique_exposure."""
+
+    def test_single_etf_all_unique(self):
+        from src.analytics.overlap import compute_unique_exposure
+        holdings = {"ETF_A": pd.DataFrame({
+            "holding_name": ["AAPL", "MSFT"],
+            "holding_ticker": ["AAPL", "MSFT"],
+            "holding_isin": ["", ""],
+            "weight_pct": [50.0, 50.0],
+        })}
+        result = compute_unique_exposure("ETF_A", holdings)
+        assert result["total_unique_pct"] == 100.0
+        assert result["unique_holdings_count"] == 2
+
+    def test_full_overlap_zero_unique(self):
+        from src.analytics.overlap import compute_unique_exposure
+        df = pd.DataFrame({
+            "holding_name": ["AAPL", "MSFT"],
+            "holding_ticker": ["AAPL", "MSFT"],
+            "holding_isin": ["", ""],
+            "weight_pct": [60.0, 40.0],
+        })
+        holdings = {"ETF_A": df.copy(), "ETF_B": df.copy()}
+        result = compute_unique_exposure("ETF_A", holdings)
+        assert result["total_unique_pct"] == 0.0
+        assert result["main_covering_etf"] == "ETF_B"
+
+    def test_partial_overlap(self):
+        from src.analytics.overlap import compute_unique_exposure
+        a = pd.DataFrame({
+            "holding_name": ["AAPL", "MSFT", "TSLA"],
+            "holding_ticker": ["AAPL", "MSFT", "TSLA"],
+            "holding_isin": ["", "", ""],
+            "weight_pct": [40.0, 30.0, 30.0],
+        })
+        b = pd.DataFrame({
+            "holding_name": ["AAPL", "MSFT"],
+            "holding_ticker": ["AAPL", "MSFT"],
+            "holding_isin": ["", ""],
+            "weight_pct": [50.0, 50.0],
+        })
+        holdings = {"ETF_A": a, "ETF_B": b}
+        result = compute_unique_exposure("ETF_A", holdings)
+        assert result["total_unique_pct"] > 0
+        assert result["unique_holdings_count"] >= 1
+        assert result["total_holdings"] == 3

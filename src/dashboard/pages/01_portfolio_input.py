@@ -28,6 +28,7 @@ _DEFAULTS: dict = {
     "analysis_hash": None,
     "analysis_timestamp": None,
     "display_names": {},
+    "editing_etf_idx": None,
 }
 for _key, _default in _DEFAULTS.items():
     if _key not in st.session_state:
@@ -35,32 +36,119 @@ for _key, _default in _DEFAULTS.items():
 
 st.header("📥 Portfolio Input")
 
-# ── Form: add ETF ───────────────────────────────────────────────────
-with st.form("add_etf_form", clear_on_submit=True):
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        ticker_input = st.text_input("Ticker / ISIN", placeholder="es. CSPX, SWDA, VWCE")
-    with col2:
-        capital_input = st.number_input("Importo (EUR)", min_value=0.0, value=10000.0, step=500.0)
-    st.caption("Inserisci il ticker (es. CSPX, SWDA) o l'ISIN (es. IE00B5BMR087). I nomi completi non sono supportati.")
-    submitted = st.form_submit_button("➕ Aggiungi ETF")
+tab_manual, tab_upload = st.tabs(["📋 Inserisci manualmente", "📤 Carica da file"])
 
-if submitted and ticker_input.strip():
-    ticker = ticker_input.strip().upper()
-    existing_tickers = {p["ticker"] for p in st.session_state.portfolio_positions}
-    if ticker in existing_tickers:
-        st.warning(f"{ticker} è già nel portafoglio.")
-    else:
-        st.session_state.portfolio_positions.append(
-            {"ticker": ticker, "capital": capital_input}
+# ── Tab 1: Manual input with autocomplete ──────────────────────────
+with tab_manual:
+    from src.dashboard.data.etf_directory import search_etf
+
+    query = st.text_input(
+        "Ticker o nome ETF",
+        placeholder="Es: SWDA, VWCE, iShares World, Vanguard All...",
+        key="etf_search_input",
+    )
+
+    selected_ticker = None
+    if query and len(query.strip()) >= 2:
+        results = search_etf(query)
+        if results:
+            options = ["— Seleziona —"] + [
+                f"{r['ticker']} — {r['name']} (TER {r['ter_pct']}%)"
+                for r in results
+            ]
+            selected = st.selectbox(
+                "Risultati trovati:",
+                options,
+                key="etf_search_select",
+                label_visibility="collapsed",
+            )
+            if selected != "— Seleziona —":
+                selected_ticker = selected.split(" — ")[0]
+        elif len(query.strip()) >= 3:
+            st.caption("Non trovato nella directory. Puoi inserire direttamente ticker o ISIN.")
+
+    with st.form("add_etf_form", clear_on_submit=True):
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            ticker_input = st.text_input(
+                "Ticker / ISIN",
+                value=selected_ticker or "",
+                placeholder="es. CSPX, SWDA, VWCE",
+            )
+        with col2:
+            capital_input = st.number_input(
+                "Importo (EUR)", min_value=0.0, value=10000.0, step=500.0,
+            )
+        st.caption("Inserisci il ticker (es. CSPX, SWDA) o l'ISIN (es. IE00B5BMR087).")
+        submitted = st.form_submit_button("➕ Aggiungi ETF")
+
+    if submitted and ticker_input.strip():
+        ticker = ticker_input.strip().upper()
+        existing_tickers = {p["ticker"] for p in st.session_state.portfolio_positions}
+        if ticker in existing_tickers:
+            st.warning(f"{ticker} è già nel portafoglio.")
+        else:
+            st.session_state.portfolio_positions.append(
+                {"ticker": ticker, "capital": capital_input}
+            )
+            for key in ("aggregated", "overlap_matrix", "redundancy_df",
+                         "factor_result", "active_share_result", "benchmark_df",
+                         "analysis_hash", "analysis_timestamp"):
+                st.session_state[key] = None
+            st.session_state.holdings_db.pop(ticker, None)
+            st.rerun()
+
+# ── Tab 2: File upload ─────────────────────────────────────────────
+with tab_upload:
+    from src.dashboard.components.portfolio_uploader import (
+        generate_template_xlsx,
+        parse_portfolio_file,
+    )
+
+    st.download_button(
+        label="📥 Scarica template Excel",
+        data=generate_template_xlsx(),
+        file_name="portafoglio_template.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    st.caption("Il file deve avere colonne: **Ticker/ISIN** e **Importo (EUR)**")
+
+    uploaded = st.file_uploader(
+        "Carica il tuo portafoglio",
+        type=["xlsx", "xls", "csv"],
+        help="Formati supportati: Excel (.xlsx, .xls) e CSV (.csv)",
+    )
+
+    if uploaded is not None:
+        positions_parsed, parse_errors = parse_portfolio_file(
+            uploaded, filename=uploaded.name,
         )
-        # Invalidate computed results
-        for key in ("aggregated", "overlap_matrix", "redundancy_df",
-                     "factor_result", "active_share_result", "benchmark_df",
-                     "analysis_hash", "analysis_timestamp"):
-            st.session_state[key] = None
-        st.session_state.holdings_db.pop(ticker, None)
-        st.rerun()
+
+        for err in parse_errors:
+            if "non trovate" in err or "leggere" in err or "vuoto" in err:
+                st.error(err)
+            else:
+                st.warning(err)
+
+        if positions_parsed:
+            preview = []
+            for p in positions_parsed:
+                preview.append({
+                    "Ticker/ISIN": p["ticker"],
+                    "Importo EUR": f"€ {p['capital']:,.0f}",
+                    "Stato": "✅",
+                })
+            st.dataframe(preview, use_container_width=True, hide_index=True)
+
+            if st.button("✅ Usa questo portafoglio", type="primary"):
+                st.session_state.portfolio_positions = positions_parsed
+                for key in ("aggregated", "overlap_matrix", "redundancy_df",
+                             "factor_result", "active_share_result", "benchmark_df",
+                             "analysis_hash", "analysis_timestamp"):
+                    st.session_state[key] = None
+                st.session_state.holdings_db = {}
+                st.session_state.display_names = {}
+                st.rerun()
 
 # ── Current portfolio ───────────────────────────────────────────────
 positions: list[dict] = st.session_state.portfolio_positions
@@ -71,19 +159,59 @@ if not positions:
 
 st.subheader("Portafoglio attuale")
 
+editing_idx = st.session_state.get("editing_etf_idx")
+
 for idx, pos in enumerate(positions):
-    col_t, col_c, col_r = st.columns([3, 2, 1])
-    display = st.session_state.get("display_names", {}).get(pos["ticker"], pos["ticker"])
-    col_t.write(f"**{display}**")
-    col_c.write(f"€ {pos['capital']:,.0f}")
-    if col_r.button("🗑️", key=f"rm_{idx}"):
-        st.session_state.portfolio_positions.pop(idx)
-        st.session_state.holdings_db.pop(pos["ticker"], None)
-        for key in ("aggregated", "overlap_matrix", "redundancy_df",
-                     "factor_result", "active_share_result",
-                     "analysis_hash", "analysis_timestamp"):
-            st.session_state[key] = None
-        st.rerun()
+    if editing_idx == idx:
+        # ── Edit mode ──
+        col_t, col_c, col_save, col_cancel = st.columns([3, 2, 0.5, 0.5])
+        with col_t:
+            new_ticker = st.text_input(
+                "Ticker", value=pos["ticker"], key=f"edit_ticker_{idx}",
+                label_visibility="collapsed",
+            )
+        with col_c:
+            new_capital = st.number_input(
+                "Importo", value=pos["capital"], min_value=0.0,
+                step=1000.0, key=f"edit_capital_{idx}",
+                label_visibility="collapsed",
+            )
+        with col_save:
+            if st.button("✓", key=f"save_{idx}"):
+                new_ticker = new_ticker.strip().upper()
+                st.session_state.portfolio_positions[idx] = {
+                    "ticker": new_ticker, "capital": new_capital,
+                }
+                if new_ticker != pos["ticker"]:
+                    st.session_state.holdings_db.pop(pos["ticker"], None)
+                    st.session_state.display_names.pop(pos["ticker"], None)
+                for key in ("aggregated", "overlap_matrix", "redundancy_df",
+                             "factor_result", "active_share_result",
+                             "analysis_hash", "analysis_timestamp"):
+                    st.session_state[key] = None
+                st.session_state.editing_etf_idx = None
+                st.rerun()
+        with col_cancel:
+            if st.button("✗", key=f"cancel_{idx}"):
+                st.session_state.editing_etf_idx = None
+                st.rerun()
+    else:
+        # ── View mode ──
+        col_t, col_c, col_edit, col_del = st.columns([3, 2, 0.5, 0.5])
+        display = st.session_state.get("display_names", {}).get(pos["ticker"], pos["ticker"])
+        col_t.write(f"**{display}**")
+        col_c.write(f"€ {pos['capital']:,.0f}")
+        if col_edit.button("✏️", key=f"edit_{idx}"):
+            st.session_state.editing_etf_idx = idx
+            st.rerun()
+        if col_del.button("🗑️", key=f"rm_{idx}"):
+            st.session_state.portfolio_positions.pop(idx)
+            st.session_state.holdings_db.pop(pos["ticker"], None)
+            for key in ("aggregated", "overlap_matrix", "redundancy_df",
+                         "factor_result", "active_share_result",
+                         "analysis_hash", "analysis_timestamp"):
+                st.session_state[key] = None
+            st.rerun()
 
 total_capital = sum(p["capital"] for p in positions)
 st.caption(f"Totale investito: **€ {total_capital:,.0f}**")

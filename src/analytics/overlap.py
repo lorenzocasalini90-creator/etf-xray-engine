@@ -136,3 +136,116 @@ def shared_holdings(
 
     result = pd.DataFrame(rows)
     return result.sort_values("weight_diff", ascending=False).reset_index(drop=True)
+
+
+def compute_unique_exposure(
+    target_ticker: str,
+    all_holdings: dict[str, pd.DataFrame],
+) -> dict:
+    """Compute what would be lost by removing an ETF from the portfolio.
+
+    Args:
+        target_ticker: ETF to analyze.
+        all_holdings: All portfolio ETFs {ticker: holdings DataFrame}.
+
+    Returns:
+        Dict with total_unique_pct, unique_holdings_count,
+        total_holdings, main_covering_etf, holdings_detail (DataFrame).
+    """
+    build_match_keys_from_holdings(all_holdings)
+
+    target_df = all_holdings.get(target_ticker)
+    if target_df is None or target_df.empty:
+        return {
+            "total_unique_pct": 0.0,
+            "unique_holdings_count": 0,
+            "total_holdings": 0,
+            "main_covering_etf": "",
+            "holdings_detail": pd.DataFrame(),
+        }
+
+    target_df = add_match_key(target_df)
+    if "weight_pct" in target_df.columns:
+        target_df["weight_pct"] = pd.to_numeric(
+            target_df["weight_pct"], errors="coerce"
+        ).fillna(0.0)
+
+    # Build target weights
+    target_weights: dict[str, dict] = {}
+    for _, row in target_df.iterrows():
+        key = row.get("_match_key")
+        if not key or (isinstance(key, float) and pd.isna(key)):
+            continue
+        w = float(row.get("weight_pct", 0) or 0)
+        name = row.get("holding_name", "")
+        ticker_h = row.get("holding_ticker", "")
+        if key in target_weights:
+            target_weights[key]["weight"] += w
+        else:
+            target_weights[key] = {"weight": w, "name": name, "ticker": ticker_h}
+
+    # Build other ETFs weight vectors
+    other_weights: dict[str, dict[str, float]] = {}
+    for etf_ticker, df in all_holdings.items():
+        if etf_ticker == target_ticker:
+            continue
+        df = add_match_key(df)
+        if "weight_pct" in df.columns:
+            df["weight_pct"] = pd.to_numeric(df["weight_pct"], errors="coerce").fillna(0.0)
+        for _, row in df.iterrows():
+            key = row.get("_match_key")
+            if not key or (isinstance(key, float) and pd.isna(key)):
+                continue
+            w = float(row.get("weight_pct", 0) or 0)
+            if key not in other_weights:
+                other_weights[key] = {}
+            other_weights[key][etf_ticker] = (
+                other_weights[key].get(etf_ticker, 0) + w
+            )
+
+    # Compute per-holding coverage
+    etf_coverage_total: dict[str, float] = {}
+    rows = []
+
+    for key, info in target_weights.items():
+        w = info["weight"]
+        others = other_weights.get(key, {})
+        if others:
+            best_etf = max(others, key=others.get)
+            covered = min(w, max(others.values()))
+        else:
+            best_etf = ""
+            covered = 0.0
+
+        unique = w - covered
+        rows.append({
+            "holding_name": info["name"],
+            "ticker_holding": info["ticker"],
+            "weight_in_target_pct": round(w, 4),
+            "covered_weight_pct": round(covered, 4),
+            "unique_weight_pct": round(unique, 4),
+            "covered_by_etf": best_etf,
+        })
+
+        if best_etf:
+            etf_coverage_total[best_etf] = (
+                etf_coverage_total.get(best_etf, 0) + covered
+            )
+
+    detail_df = pd.DataFrame(rows)
+    if not detail_df.empty:
+        detail_df = detail_df.sort_values(
+            "weight_in_target_pct", ascending=False
+        ).reset_index(drop=True)
+
+    unique_total = sum(r["unique_weight_pct"] for r in rows)
+    unique_count = sum(1 for r in rows if r["covered_weight_pct"] == 0)
+    main_etf = max(etf_coverage_total, key=etf_coverage_total.get) if etf_coverage_total else ""
+
+    return {
+        "total_unique_pct": round(unique_total, 2),
+        "unique_holdings_count": unique_count,
+        "total_holdings": len(rows),
+        "main_covering_etf": main_etf,
+        "holdings_detail": detail_df,
+    }

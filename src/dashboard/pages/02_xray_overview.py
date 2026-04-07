@@ -223,3 +223,69 @@ if not sector_df.empty or not country_df.empty:
     st.caption("→ Analisi completa con deviazioni vs benchmark: pagina **Sector & Country**")
 else:
     st.info("Dati settoriali e geografici non disponibili per questo portafoglio.")
+
+# ── Actionable recommendations ─────────────────────────────────────
+redundancy_df = st.session_state.get("redundancy_df")
+
+if redundancy_df is not None and not redundancy_df.empty:
+    from src.analytics.recommendations import generate_recommendations
+
+    # Build inputs from session_state
+    red_scores = dict(zip(
+        redundancy_df["etf_ticker"],
+        redundancy_df["redundancy_pct"] / 100,
+    ))
+    ter_wasted = dict(zip(
+        redundancy_df["etf_ticker"],
+        redundancy_df["ter_wasted"],
+    ))
+
+    positions = st.session_state.get("portfolio_positions", [])
+    total_eur = sum(p["capital"] for p in positions)
+
+    # Top holding
+    top1 = aggregated.nlargest(1, "real_weight_pct").iloc[0] if not aggregated.empty else None
+    top1_w = (top1["real_weight_pct"] / 100) if top1 is not None else 0
+    top1_n = top1["name"] if top1 is not None else ""
+
+    bench_name = st.session_state.get("benchmark_name") or "mercato"
+    bench_labels = {"MSCI_WORLD": "MSCI World", "SP500": "S&P 500",
+                    "MSCI_EM": "MSCI EM", "FTSE_ALL_WORLD": "FTSE All-World"}
+    bench_display = bench_labels.get(bench_name, bench_name)
+
+    total_ter_eur = sum(ter_wasted.values()) + sum(
+        (1 - red_scores.get(p["ticker"], 0)) * 0.002 * p["capital"]
+        for p in positions
+    )
+
+    recs = generate_recommendations(
+        redundancy_scores=red_scores,
+        ter_wasted_eur=ter_wasted,
+        active_share=active_share_pct,
+        hhi=hhi_stats["hhi"],
+        top1_weight=top1_w,
+        top1_name=top1_n,
+        n_etf=len(positions),
+        portfolio_total_eur=total_eur,
+        benchmark_name=bench_display,
+        current_total_ter_eur=total_ter_eur,
+    )
+
+    if recs:
+        with st.expander("💡 Suggerimenti per il tuo portafoglio", expanded=True):
+            for rec in sorted(recs, key=lambda r: {"high": 0, "medium": 1, "low": 2}[r.severity]):
+                badge = {"high": "🔴 Alta priorità",
+                         "medium": "🟡 Da valutare",
+                         "low": "🟢 Nota"}[rec.severity]
+                st.markdown(f"**{badge} — {rec.title}**")
+                st.write(rec.explanation)
+                st.markdown(f"→ *{rec.action}*")
+                if rec.saving_eur_annual and rec.saving_eur_annual > 0:
+                    st.success(f"💰 Risparmio potenziale: ~€{rec.saving_eur_annual:.0f}/anno")
+                st.divider()
+
+            st.caption(
+                "ℹ️ Questi suggerimenti sono generati automaticamente dall'analisi "
+                "quantitativa del portafoglio. Non costituiscono consulenza "
+                "finanziaria. Consulta un professionista per decisioni di investimento."
+            )
