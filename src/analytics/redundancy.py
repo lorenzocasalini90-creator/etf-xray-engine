@@ -119,3 +119,65 @@ def redundancy_scores(
         })
 
     return pd.DataFrame(rows)
+
+
+def redundancy_breakdown(
+    etf_ticker: str,
+    holdings_db: dict[str, pd.DataFrame],
+) -> dict[str, float]:
+    """Decompose redundancy: how much does each other ETF contribute?
+
+    For a given ETF, calculates what percentage of its total weight is
+    shared with each other ETF in the portfolio. A holding shared with
+    multiple ETFs counts towards each (so contributions can sum > 100%).
+
+    Args:
+        etf_ticker: The ETF to analyze.
+        holdings_db: All portfolio ETFs {ticker: holdings DataFrame}.
+
+    Returns:
+        Dict mapping other ETF tickers to their contribution percentage
+        (0-100 scale). Empty dict if ETF not found or portfolio has 1 ETF.
+    """
+    if etf_ticker not in holdings_db or len(holdings_db) < 2:
+        return {}
+
+    build_match_keys_from_holdings(holdings_db)
+
+    target_df = add_match_key(holdings_db[etf_ticker])
+    if "weight_pct" in target_df.columns:
+        target_df["weight_pct"] = pd.to_numeric(
+            target_df["weight_pct"], errors="coerce"
+        ).fillna(0.0)
+
+    target_weights: dict[str, float] = {}
+    for _, row in target_df.iterrows():
+        key = row.get("_match_key")
+        if not key or (isinstance(key, float) and pd.isna(key)):
+            continue
+        w = float(row.get("weight_pct", 0) or 0)
+        target_weights[key] = target_weights.get(key, 0) + w
+
+    total_weight = sum(target_weights.values())
+    if total_weight == 0:
+        return {}
+
+    target_keys = set(target_weights.keys())
+
+    contributions: dict[str, float] = {}
+    for other_ticker, other_df in holdings_db.items():
+        if other_ticker == etf_ticker:
+            continue
+        other_df = add_match_key(other_df)
+        other_keys: set[str] = set()
+        for _, row in other_df.iterrows():
+            key = row.get("_match_key")
+            if key and not (isinstance(key, float) and pd.isna(key)):
+                other_keys.add(key)
+
+        shared = target_keys & other_keys
+        shared_weight = sum(target_weights[k] for k in shared)
+        pct = (shared_weight / total_weight) * 100
+        contributions[other_ticker] = round(pct, 2)
+
+    return contributions

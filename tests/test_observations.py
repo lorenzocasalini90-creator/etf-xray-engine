@@ -43,7 +43,7 @@ class TestRedundancyObservations:
             **_BASE,
             "redundancy_scores": {"CSPX": 0.99, "SWDA": 0.10},
         })
-        red = [o for o in obs if o.page == "redundancy"]
+        red = [o for o in obs if o.page == "overlap_redundancy"]
         assert any(o.severity == "high" for o in red)
 
     def test_high_ter_wasted(self):
@@ -51,7 +51,7 @@ class TestRedundancyObservations:
             **_BASE,
             "ter_wasted_eur": {"CSPX": 80.0, "SWDA": 50.0},
         })
-        red = [o for o in obs if o.page == "redundancy"]
+        red = [o for o in obs if o.page == "overlap_redundancy"]
         assert any("commissioni" in o.text for o in red)
 
 
@@ -61,7 +61,7 @@ class TestOverlapObservations:
             **_BASE,
             "overlap_pairs": [("CSPX", "SWDA", 65.0)],
         })
-        ovr = [o for o in obs if o.page == "overlap"]
+        ovr = [o for o in obs if o.page == "overlap_redundancy"]
         assert any(o.severity == "high" for o in ovr)
 
 
@@ -73,4 +73,4 @@ class TestDiversifiedPortfolio:
     def test_filtered_by_page(self):
         obs = generate_observations(**_BASE)
         for o in obs:
-            assert o.page in ("xray", "redundancy", "overlap", "sector", "factor")
+            assert o.page in ("xray", "overlap_redundancy", "sector", "factor")

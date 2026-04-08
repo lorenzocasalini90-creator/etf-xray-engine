@@ -61,9 +61,8 @@ Usa il menu laterale per navigare tra le schermate:
 
 1. **Portfolio Input** — inserisci i tuoi ETF e lancia l'analisi
 2. **X-Ray Overview** — KPI, titoli principali, active bets
-3. **ETF Redundancy** — quanto è ridondante ogni ETF?
-4. **Overlap Heatmap** — sovrapposizione tra coppie di ETF
-5. **Sector & Country** — esposizione settoriale e geografica
-6. **Factor Fingerprint** — profilo fattoriale e confronto benchmark
+3. **Overlap & Ridondanza** — ridondanza per ETF, overlap pairwise, esposizione unica
+4. **Sector & Country** — esposizione settoriale e geografica
+5. **Factor Fingerprint** — profilo fattoriale e confronto benchmark
 """
 )

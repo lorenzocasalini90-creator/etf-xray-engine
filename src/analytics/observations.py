@@ -74,21 +74,21 @@ def generate_observations(
             obs.append(Observation(
                 f"{max_ticker} è ridondante per il {max_r * 100:.0f}% — quasi tutte "
                 "le sue holdings sono già presenti in altri ETF.",
-                "high", "redundancy",
+                "high", "overlap_redundancy",
             ))
         total_wasted = sum(ter_wasted_eur.values())
         if total_wasted > 100:
             obs.append(Observation(
                 f"Stai pagando circa €{total_wasted:.0f}/anno in commissioni "
                 "su holdings duplicate.",
-                "high", "redundancy",
+                "high", "overlap_redundancy",
             ))
         moderate_count = sum(1 for v in redundancy_scores.values() if v > 0.50)
         if moderate_count > 1:
             obs.append(Observation(
                 "Più ETF hanno ridondanza superiore al 50% — considera "
                 "una consolidazione.",
-                "medium", "redundancy",
+                "medium", "overlap_redundancy",
             ))
 
     # Overlap observations
@@ -97,13 +97,13 @@ def generate_observations(
             obs.append(Observation(
                 f"{etf_a} e {etf_b} si sovrappongono per il {overlap:.0f}% "
                 "— alta ridondanza pairwise.",
-                "high", "overlap",
+                "high", "overlap_redundancy",
             ))
         elif overlap > 40:
             obs.append(Observation(
                 f"{etf_a} e {etf_b} condividono il {overlap:.0f}% "
                 "dell'esposizione.",
-                "medium", "overlap",
+                "medium", "overlap_redundancy",
             ))
 
     return obs
