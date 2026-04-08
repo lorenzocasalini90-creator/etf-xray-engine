@@ -394,6 +394,7 @@ if run_analysis:
         input_id = pos["ticker"]
         if input_id in display_names and not force_refresh:
             continue
+        # 1. Try etf_ticker from holdings (fetcher may have resolved it)
         if input_id in holdings_db:
             df = holdings_db[input_id]
             if "etf_ticker" in df.columns:
@@ -401,11 +402,17 @@ if run_analysis:
                 if len(resolved) > 0 and resolved[0] != input_id:
                     display_names[input_id] = resolved[0]
                     continue
-        # ISIN truncation fallback
-        if len(input_id) == 12 and input_id[:2].isalpha():
-            display_names[input_id] = f"{input_id[:7]}…{input_id[-2:]}"
-        else:
-            display_names[input_id] = input_id
+        # 2. Try ETF directory CSV (has ISIN→ticker for common UCITS)
+        try:
+            from src.dashboard.data.etf_directory import search_etf
+            results = search_etf(input_id, limit=1)
+            if results and results[0].get("ticker") and results[0]["ticker"] != input_id:
+                display_names[input_id] = results[0]["ticker"]
+                continue
+        except Exception:
+            pass
+        # 3. Fallback: use full identifier as-is (never truncate)
+        display_names[input_id] = input_id
     st.session_state.display_names = display_names
 
     # Aggregate
