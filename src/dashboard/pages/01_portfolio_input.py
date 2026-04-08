@@ -465,12 +465,14 @@ if run_analysis:
         us_row = country_df_obs[country_df_obs["country"].str.contains("United States", case=False, na=False)]
         us_w = us_row["weight_pct"].sum() if not us_row.empty else 0.0
 
+    from src.dashboard.components.display_utils import get_display_name
+
     red_df_obs = st.session_state.get("redundancy_df")
     red_scores_obs = {}
     ter_wasted_obs = {}
     if red_df_obs is not None and not red_df_obs.empty:
-        red_scores_obs = dict(zip(red_df_obs["etf_ticker"], red_df_obs["redundancy_pct"] / 100))
-        ter_wasted_obs = dict(zip(red_df_obs["etf_ticker"], red_df_obs["ter_wasted"].fillna(0)))
+        red_scores_obs = {get_display_name(k): v for k, v in zip(red_df_obs["etf_ticker"], red_df_obs["redundancy_pct"] / 100)}
+        ter_wasted_obs = {get_display_name(k): v for k, v in zip(red_df_obs["etf_ticker"], red_df_obs["ter_wasted"].fillna(0))}
 
     overlap_mat_obs = st.session_state.get("overlap_matrix")
     overlap_pairs_obs = []
@@ -478,7 +480,7 @@ if run_analysis:
         ol_labels = overlap_mat_obs.columns.tolist()
         for i_o in range(len(ol_labels)):
             for j_o in range(i_o + 1, len(ol_labels)):
-                overlap_pairs_obs.append((ol_labels[i_o], ol_labels[j_o], overlap_mat_obs.iloc[i_o, j_o]))
+                overlap_pairs_obs.append((get_display_name(ol_labels[i_o]), get_display_name(ol_labels[j_o]), overlap_mat_obs.iloc[i_o, j_o]))
 
     top1_obs = aggregated.nlargest(1, "real_weight_pct").iloc[0] if not aggregated.empty else None
     bench_labels_obs = {"MSCI_WORLD": "MSCI World", "SP500": "S&P 500",

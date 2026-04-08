@@ -49,22 +49,22 @@ col_s, col_c = st.columns(2)
 
 with col_s:
     st.subheader("Esposizione per Settore")
-    fig_s = px.pie(
-        sector_df,
-        names="sector",
-        values="weight_pct",
-        hole=0.35,
+    top_sectors = sector_df.head(11).sort_values("weight_pct", ascending=True)
+    fig_s = px.bar(
+        top_sectors,
+        x="weight_pct",
+        y="sector",
+        orientation="h",
+        labels={"weight_pct": "Peso (%)", "sector": ""},
+        color="weight_pct",
+        color_continuous_scale="Viridis",
+        text=top_sectors["weight_pct"].map(lambda v: f"{v:.1f}%"),
     )
-    fig_s.update_traces(
-        textposition="outside",
-        textinfo="label+percent",
-        textfont_size=11,
-        insidetextorientation="horizontal",
-    )
+    fig_s.update_traces(textposition="outside")
     fig_s.update_layout(
         showlegend=False,
-        height=500,
-        margin=dict(l=20, r=20, t=40, b=20),
+        height=max(350, len(top_sectors) * 36),
+        xaxis=dict(range=[0, top_sectors["weight_pct"].max() * 1.15]),
     )
     st.plotly_chart(fig_s, use_container_width=True)
 
@@ -79,7 +79,7 @@ with col_c:
         labels={"weight_pct": "Peso (%)", "country": ""},
         color="weight_pct",
         color_continuous_scale="Viridis",
-        text=top_countries["weight_pct"].round(1).astype(str) + "%",
+        text=top_countries["weight_pct"].map(lambda v: f"{v:.1f}%"),
     )
     fig_c.update_traces(textposition="outside")
     fig_c.update_layout(
