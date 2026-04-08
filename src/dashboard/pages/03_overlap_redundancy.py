@@ -39,6 +39,27 @@ if "real_weight_pct" in redundancy_df.columns:
 redundancy_df = redundancy_df.copy()
 redundancy_df["display_name"] = redundancy_df["etf_ticker"].map(get_display_name)
 
+# ── How to read this page (prominent but collapsed) ──────────────
+with st.expander("📖 Come leggere questa pagina", expanded=False):
+    st.markdown("""
+**Il Redundancy Score misura quanto ogni ETF si sovrappone
+agli altri nel tuo portafoglio.**
+
+- 🔴 **> 70%**: la maggior parte delle holdings è già coperta
+  da altri ETF. Stai pagando commissioni doppie per gli stessi titoli.
+- 🟡 **40-70%**: sovrapposizione moderata. Valuta se il valore
+  aggiunto giustifica il costo.
+- 🟢 **< 30%**: buona complementarietà. Questo ETF aggiunge
+  esposizione genuinamente diversa.
+
+**TER sprecato** = quanto paghi ogni anno in commissioni su
+holdings già coperte da altri ETF nel portafoglio.
+
+**Ridondanza vs Overlap:** Redundancy 100% non significa overlap 100%
+con un singolo ETF. Significa che tutti i titoli sono presenti in almeno
+uno degli altri ETF — ma distribuiti su più ETF diversi.
+""")
+
 # ── LAYER 1: Summary ──────────────────────────────────────────────
 _red_scores = dict(zip(redundancy_df["display_name"], redundancy_df["redundancy_pct"] / 100))
 _ter_wasted_all = dict(zip(redundancy_df["display_name"], redundancy_df["ter_wasted"].fillna(0)))
@@ -70,49 +91,55 @@ st.subheader("Dettaglio ridondanza per ETF")
 
 from src.analytics.redundancy import redundancy_breakdown
 
-for _, row in redundancy_df.iterrows():
-    raw_ticker = row["etf_ticker"]
-    display = row["display_name"]
-    r_pct = row["redundancy_pct"]
-    ter = row.get("ter_wasted", 0) or 0
-    verdict = row["verdict"]
-    icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(verdict, "⚪")
+_etf_rows = list(redundancy_df.iterrows())
+_n_etf = len(_etf_rows)
 
-    with st.container():
-        col_name, col_bar = st.columns([1, 3])
-        with col_name:
-            st.markdown(f"**{icon} {display}**")
-        with col_bar:
-            st.progress(min(r_pct / 100, 1.0))
+if _n_etf >= 5:
+    # Compact dataframe for large portfolios
+    _compact = redundancy_df[["display_name", "redundancy_pct", "ter_wasted", "verdict"]].copy()
+    _compact.columns = ["ETF", "Ridondanza %", "TER sprecato €/anno", "Livello"]
+    _compact["Ridondanza %"] = _compact["Ridondanza %"].map(lambda v: f"{v:.1f}%")
+    _compact["TER sprecato €/anno"] = _compact["TER sprecato €/anno"].fillna(0).map(lambda v: f"€{v:,.2f}")
+    _compact["Livello"] = _compact["Livello"].map({"green": "🟢", "yellow": "🟡", "red": "🔴"})
+    st.dataframe(_compact, use_container_width=True, hide_index=True)
+else:
+    # 2-column card layout for small portfolios
+    for i in range(0, _n_etf, 2):
+        cols = st.columns(2)
+        for j, col in enumerate(cols):
+            if i + j >= _n_etf:
+                break
+            _, row = _etf_rows[i + j]
+            raw_ticker = row["etf_ticker"]
+            display = row["display_name"]
+            r_pct = row["redundancy_pct"]
+            ter = row.get("ter_wasted", 0) or 0
+            verdict = row["verdict"]
+            bg = {"green": GREEN_LIGHT, "yellow": YELLOW_LIGHT, "red": RED_LIGHT}.get(verdict, "#f3f4f6")
 
-        # Breakdown: which ETFs contribute to this redundancy?
-        breakdown = redundancy_breakdown(raw_ticker, holdings_db)
-        if breakdown:
-            parts = []
-            for other_raw, contrib in sorted(breakdown.items(), key=lambda x: -x[1]):
-                if contrib > 0.5:  # Only show meaningful contributions
-                    other_display = get_display_name(other_raw)
-                    parts.append(f"**{other_display}** {contrib:.0f}%")
-            if parts:
-                st.caption(f"Coperto da: {', '.join(parts)}")
+            # Breakdown line
+            breakdown = redundancy_breakdown(raw_ticker, holdings_db)
+            breakdown_text = ""
+            if breakdown:
+                parts = []
+                for other_raw, contrib in sorted(breakdown.items(), key=lambda x: -x[1]):
+                    if contrib > 0.5:
+                        parts.append(f"{get_display_name(other_raw)} {contrib:.0f}%")
+                if parts:
+                    breakdown_text = f"<div style='font-size:0.78rem; color:#374151; margin-top:4px;'>Coperto da: {', '.join(parts)}</div>"
 
-        st.caption(f"TER sprecato: **€{ter:,.2f}**/anno · Ridondanza: **{r_pct:.1f}%**")
-        st.markdown("---")
-
-with st.expander("ℹ️ Cos'è la Ridondanza?"):
-    st.markdown(
-        "Per ogni ETF, misura quanta percentuale delle sue holdings è già presente "
-        "in almeno un altro ETF del tuo portafoglio.\n\n"
-        "**Attenzione:** Redundancy 100% **non** significa overlap 100% con un singolo ETF. "
-        "Significa che tutti i titoli di questo ETF sono presenti in almeno uno degli altri "
-        "ETF nel tuo portafoglio — ma possono essere distribuiti su più ETF diversi.\n\n"
-        "Ad esempio, CSPX (S&P 500) può avere ridondanza 99% perché SWDA (MSCI World) "
-        "contiene quasi tutti i suoi titoli. Ma l'overlap pairwise tra CSPX e SWDA è solo "
-        "~53% perché SWDA contiene anche molti titoli NON presenti in CSPX.\n\n"
-        "- 🟢 **< 30%** — bassa ridondanza, aggiunge esposizione unica\n"
-        "- 🟡 **30-70%** — moderata, valuta se giustifica il TER\n"
-        "- 🔴 **> 70%** — alta ridondanza, considera di rimuoverlo"
-    )
+            with col:
+                st.markdown(
+                    f"""<div style='background:{bg}; border-radius:8px;
+                    padding:12px 16px; margin-bottom:12px;'>
+                    <div style='font-weight:700; font-size:1rem;'>{display}</div>
+                    <div style='font-size:1.4rem; font-weight:700;'>{r_pct:.0f}%</div>
+                    {breakdown_text}
+                    <div style='font-size:0.8rem; color:#374151;'>
+                    TER sprecato: €{ter:,.2f}/anno</div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
 
 # ── LAYER 3: Heatmap drill-down (collapsible) ────────────────────
 with st.expander("📊 Dettaglio overlap per coppia"):

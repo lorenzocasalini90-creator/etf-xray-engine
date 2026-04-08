@@ -114,7 +114,10 @@ if _tilts:
         ),
         unsafe_allow_html=True,
     )
-    st.markdown("")
+    st.caption(
+        "I badge indicano le caratteristiche più marcate del portafoglio "
+        "rispetto al benchmark. 🟣 = tilt significativo rilevato."
+    )
 
 st.subheader("Radar — profilo fattoriale")
 
@@ -160,6 +163,21 @@ st.plotly_chart(fig_radar, use_container_width=True)
 st.caption("* Momentum non disponibile — richiede serie storiche prezzi 6-12 mesi. "
            "Sarà implementato prossimamente.")
 
+with st.expander("📖 Come leggere il radar chart", expanded=False):
+    st.markdown("""
+Ogni asse del radar rappresenta una dimensione fattoriale.
+I valori sono normalizzati su scala 0-100 per confronto visivo.
+
+| Asse | Cosa misura | Valore alto significa |
+|---|---|---|
+| **Value** | P/E medio ponderato | P/E elevato → tilt Growth |
+| **Size (Large Cap)** | % holdings large-cap (>$10B) | Concentrazione su grandi aziende |
+| **Quality** | ROE medio ponderato | Aziende con alta redditività |
+| **Dividend Yield** | Rendimento da dividendi medio | Portafoglio income-oriented |
+
+**Blu** = il tuo portafoglio · **Rosa** = benchmark selezionato
+""")
+
 with st.expander("ℹ️ Cos'è il Factor Fingerprint?"):
     st.markdown(
         "Il \"DNA\" del tuo portafoglio lungo 4 dimensioni:\n\n"
@@ -195,7 +213,7 @@ for dim, port, delta in row_base:
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 # ── Coverage disclosure ─────────────────────────────────────────────
-st.subheader("Coverage Disclosure")
+st.markdown("#### 📊 Affidabilità dell'analisi fattoriale")
 
 total_h = coverage.get("total_holdings", 1) or 1
 l1 = coverage.get("L1_pct", 0)
@@ -203,30 +221,48 @@ l2 = coverage.get("L2_pct", 0)
 l3 = coverage.get("L3_pct", 0)
 l4 = coverage.get("L4_pct", 0)
 
-cov_cols = st.columns(4)
-cov_cols[0].metric("L1 — Sector", f"{l1:.1f}%")
-cov_cols[1].metric("L2 — Fundamentals", f"{l2:.1f}%")
-cov_cols[2].metric("L3 — Proxy", f"{l3:.1f}%")
-cov_cols[3].metric("L4 — Unclassified", f"{l4:.1f}%")
+# Text explanations before the bar
+_cov_lines = []
+if l1 > 0:
+    _cov_lines.append(
+        f"**L1 — Dati ufficiali emittente**: {l1:.0f}% "
+        "*(classificazione diretta da iShares/Vanguard/Amundi)*"
+    )
+if l2 > 0:
+    _cov_lines.append(
+        f"**L2 — Dati fondamentali (yfinance)**: {l2:.0f}% "
+        "*(P/E, P/B, ROE scaricati per ogni titolo)*"
+    )
+if l3 > 0:
+    _cov_lines.append(
+        f"**L3 — Stima settoriale**: {l3:.0f}% "
+        "*(valori tipici del settore GICS usati come proxy)*"
+    )
+if l4 > 0:
+    _cov_lines.append(
+        f"**L4 — Non classificato**: {l4:.0f}% "
+        "*(dati non disponibili — escluso dall'analisi)*"
+    )
+for _line in _cov_lines:
+    st.markdown(f"• {_line}")
 
 # Stacked bar
 fig_cov = go.Figure()
-fig_cov.add_trace(go.Bar(name="L1 Sector", x=[l1], y=["Coverage"], orientation="h", marker_color="#2ecc71"))
-fig_cov.add_trace(go.Bar(name="L2 Fundamentals", x=[l2], y=["Coverage"], orientation="h", marker_color="#3498db"))
+fig_cov.add_trace(go.Bar(name="L1 Emittente", x=[l1], y=["Coverage"], orientation="h", marker_color="#2ecc71"))
+fig_cov.add_trace(go.Bar(name="L2 Fondamentali", x=[l2], y=["Coverage"], orientation="h", marker_color="#3498db"))
 fig_cov.add_trace(go.Bar(name="L3 Proxy", x=[l3], y=["Coverage"], orientation="h", marker_color="#f39c12"))
-fig_cov.add_trace(go.Bar(name="L4 Unclassified", x=[l4], y=["Coverage"], orientation="h", marker_color="#e74c3c"))
+fig_cov.add_trace(go.Bar(name="L4 Non classificato", x=[l4], y=["Coverage"], orientation="h", marker_color="#e74c3c"))
 fig_cov.update_layout(barmode="stack", height=120, xaxis=dict(range=[0, 100], title="%"), yaxis=dict(visible=False))
 st.plotly_chart(fig_cov, use_container_width=True)
 
-with st.expander("ℹ️ Cos'è la Coverage?"):
-    st.markdown(
-        "Non tutti i titoli hanno dati fondamentali disponibili. "
-        "La barra mostra quanta percentuale del portafoglio è stata analizzata e con quale fonte:\n\n"
-        "- **L1 Sector** — classificazione settoriale disponibile\n"
-        "- **L2 Fundamentals** — dati reali (P/E, ROE, etc.) da yfinance\n"
-        "- **L3 Proxy** — stima basata sulla media del settore\n"
-        "- **L4 Unclassified** — nessun dato disponibile"
-    )
+# Reliability badge
+_total_reliable = l1 + l2
+if _total_reliable >= 80:
+    st.success(f"✅ {_total_reliable:.0f}% del portafoglio ha dati affidabili (L1+L2).")
+elif _total_reliable >= 60:
+    st.warning(f"⚠️ {_total_reliable:.0f}% con dati affidabili. Interpreta con cautela.")
+else:
+    st.error(f"❌ Solo {_total_reliable:.0f}% con dati affidabili. Risultati indicativi.")
 
 # ── Factor Drivers ──────────────────────────────────────────────────
 st.subheader("Factor Drivers")

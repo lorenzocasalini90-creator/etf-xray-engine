@@ -40,7 +40,7 @@ def show_global_header() -> None:
     cols[1].markdown(f"**{n_holdings:,}** titoli")
     cols[2].markdown(f"HHI {hhi:.3f} {hhi_badge}")
     cols[3].markdown(f"Eff.N **{eff_n:.0f}**")
-    cols[4].markdown(f"AS {as_str}")
+    cols[4].markdown(f"Active Share {as_str}")
     cols[5].markdown(f"Top-10 **{top10:.1f}%**")
     cols[6].markdown(f"📐 vs {bench_display}")
 
