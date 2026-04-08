@@ -47,48 +47,82 @@ with st.expander("ℹ️ Cos'è l'Esposizione Settoriale e Geografica?"):
 # ── Two-column pie/bar ──────────────────────────────────────────────
 col_s, col_c = st.columns(2)
 
+from src.dashboard.components.chart_helpers import apply_bar_chart_style, apply_deviation_bar_style
+
 with col_s:
     st.subheader("Esposizione per Settore")
-    top_sectors = sector_df.head(11).sort_values("weight_pct", ascending=True)
+    # Sort Unknown/Other to bottom
+    _s = sector_df.head(11).copy()
+    _s["_is_unknown"] = _s["sector"].str.lower().isin(["unknown", "other", ""])
+    _s = _s.sort_values(["_is_unknown", "weight_pct"], ascending=[True, True])
+    top_sectors = _s.drop(columns="_is_unknown")
+
+    # Gray for Unknown, Viridis for rest
+    _s_colors = ["#9ca3af" if s.lower() in ("unknown", "other", "") else "#2563eb"
+                 for s in top_sectors["sector"]]
+
     fig_s = px.bar(
         top_sectors,
         x="weight_pct",
         y="sector",
         orientation="h",
         labels={"weight_pct": "Peso (%)", "sector": ""},
-        color="weight_pct",
-        color_continuous_scale="Viridis",
-        text=top_sectors["weight_pct"].map(lambda v: f"{v:.1f}%"),
     )
-    fig_s.update_traces(textposition="outside")
+    fig_s.update_traces(marker_color=_s_colors)
     fig_s.update_layout(
         showlegend=False,
         height=max(350, len(top_sectors) * 36),
         xaxis=dict(range=[0, top_sectors["weight_pct"].max() * 1.15]),
     )
+    apply_bar_chart_style(fig_s, top_sectors["weight_pct"].tolist())
     st.plotly_chart(fig_s, use_container_width=True)
+
+    # Unknown disclosure
+    _unknown_s = sector_df[sector_df["sector"].str.lower().isin(["unknown", "other", ""])]
+    if not _unknown_s.empty:
+        _unk_pct = _unknown_s["weight_pct"].sum()
+        if _unk_pct > 0:
+            st.caption(
+                f"ℹ️ {_unk_pct:.1f}% del portafoglio non ha dati "
+                "settoriali disponibili (titoli non classificati o dati mancanti)."
+            )
 
 with col_c:
     st.subheader("Esposizione per Paese")
-    top_countries = country_df.head(10)
+    _c = country_df.head(10).copy()
+    _c["_is_unknown"] = _c["country"].str.lower().isin(["unknown", "other", ""])
+    _c = _c.sort_values(["_is_unknown", "weight_pct"], ascending=[False, False])
+    top_countries = _c.drop(columns="_is_unknown")
+
+    _c_colors = ["#9ca3af" if c.lower() in ("unknown", "other", "") else "#2563eb"
+                 for c in top_countries["country"]]
+
     fig_c = px.bar(
         top_countries,
         x="weight_pct",
         y="country",
         orientation="h",
         labels={"weight_pct": "Peso (%)", "country": ""},
-        color="weight_pct",
-        color_continuous_scale="Viridis",
-        text=top_countries["weight_pct"].map(lambda v: f"{v:.1f}%"),
     )
-    fig_c.update_traces(textposition="outside")
+    fig_c.update_traces(marker_color=_c_colors)
     fig_c.update_layout(
         yaxis=dict(autorange="reversed"),
         showlegend=False,
         height=450,
         xaxis=dict(range=[0, top_countries["weight_pct"].max() * 1.15]),
     )
+    apply_bar_chart_style(fig_c, top_countries["weight_pct"].tolist())
     st.plotly_chart(fig_c, use_container_width=True)
+
+    # Unknown disclosure
+    _unknown_c = country_df[country_df["country"].str.lower().isin(["unknown", "other", ""])]
+    if not _unknown_c.empty:
+        _unk_pct_c = _unknown_c["weight_pct"].sum()
+        if _unk_pct_c > 0:
+            st.caption(
+                f"ℹ️ {_unk_pct_c:.1f}% del portafoglio non ha dati "
+                "geografici disponibili (titoli non classificati o dati mancanti)."
+            )
 
 # ── Benchmark deviation bars ────────────────────────────────────────
 if benchmark_df is not None and not benchmark_df.empty:
@@ -103,17 +137,17 @@ if benchmark_df is not None and not benchmark_df.empty:
     merged_s = merged_s.sort_values("delta", ascending=True)
 
     with tab_sec:
+        _ds_colors = ["#16a34a" if v >= 0 else "#dc2626" for v in merged_s["delta"]]
         fig_ds = px.bar(
             merged_s,
             x="delta",
             y="sector",
             orientation="h",
             labels={"delta": "Delta (%)", "sector": ""},
-            color="delta",
-            color_continuous_scale="RdYlGn",
-            color_continuous_midpoint=0,
         )
+        fig_ds.update_traces(marker_color=_ds_colors)
         fig_ds.update_layout(height=max(300, len(merged_s) * 35))
+        apply_deviation_bar_style(fig_ds, merged_s["delta"].tolist())
         st.plotly_chart(fig_ds, use_container_width=True)
 
     # Country deviation
@@ -124,17 +158,17 @@ if benchmark_df is not None and not benchmark_df.empty:
     merged_c = merged_c.sort_values("delta", ascending=True).tail(20)
 
     with tab_cou:
+        _dc_colors = ["#16a34a" if v >= 0 else "#dc2626" for v in merged_c["delta"]]
         fig_dc = px.bar(
             merged_c,
             x="delta",
             y="country",
             orientation="h",
             labels={"delta": "Delta (%)", "country": ""},
-            color="delta",
-            color_continuous_scale="RdYlGn",
-            color_continuous_midpoint=0,
         )
+        fig_dc.update_traces(marker_color=_dc_colors)
         fig_dc.update_layout(height=max(300, len(merged_c) * 35))
+        apply_deviation_bar_style(fig_dc, merged_c["delta"].tolist())
         st.plotly_chart(fig_dc, use_container_width=True)
 
     with st.expander("ℹ️ Cos'è la Deviazione vs Benchmark?"):

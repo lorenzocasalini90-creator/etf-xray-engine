@@ -182,6 +182,8 @@ with st.expander("📊 Visualizza grafico esposizione (Top 20)", expanded=False)
         color_continuous_scale="Blues",
     )
     fig.update_layout(yaxis=dict(autorange="reversed"), showlegend=False, height=500)
+    from src.dashboard.components.chart_helpers import apply_bar_chart_style
+    apply_bar_chart_style(fig, top20["real_weight_pct"].tolist())
     st.plotly_chart(fig, use_container_width=True)
 
 # ── Active Bets vs Benchmark ───────────────────────────────────────
@@ -239,13 +241,14 @@ if not sector_df.empty or not country_df.empty:
                 labels={"weight_pct": "%", "country": ""},
                 text=top5_c["weight_pct"].map(lambda x: f"{x:.1f}%"),
             )
-            fig_c.update_traces(marker_color="#2563eb", textposition="outside")
+            fig_c.update_traces(marker_color="#2563eb")
             fig_c.update_layout(
                 yaxis=dict(autorange="reversed"),
                 showlegend=False,
                 height=250,
-                margin=dict(l=0, r=40, t=10, b=10),
             )
+            from src.dashboard.components.chart_helpers import apply_bar_chart_style
+            apply_bar_chart_style(fig_c, top5_c["weight_pct"].tolist())
             st.plotly_chart(fig_c, use_container_width=True)
         else:
             st.info("Dati geografici non disponibili.")
@@ -262,13 +265,13 @@ if not sector_df.empty or not country_df.empty:
                 labels={"weight_pct": "%", "sector": ""},
                 text=top5_s["weight_pct"].map(lambda x: f"{x:.1f}%"),
             )
-            fig_s.update_traces(marker_color="#16a34a", textposition="outside")
+            fig_s.update_traces(marker_color="#16a34a")
             fig_s.update_layout(
                 yaxis=dict(autorange="reversed"),
                 showlegend=False,
                 height=250,
-                margin=dict(l=0, r=40, t=10, b=10),
             )
+            apply_bar_chart_style(fig_s, top5_s["weight_pct"].tolist())
             st.plotly_chart(fig_s, use_container_width=True)
         else:
             st.info("Dati settoriali non disponibili.")
