@@ -11,6 +11,9 @@ _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+from src.dashboard.components.analytics import track_visit
+track_visit("xray_overview")
+
 st.header("🔍 X-Ray Overview")
 from src.dashboard.components.global_header import show_global_header
 show_global_header()

@@ -39,3 +39,6 @@ coverage.xml
 # OS
 .DS_Store
 Thumbs.db
+
+# Analytics data (visit tracking)
+analytics_data.json

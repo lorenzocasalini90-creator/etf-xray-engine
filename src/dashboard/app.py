@@ -66,3 +66,6 @@ Usa il menu laterale per navigare tra le schermate:
 5. **Factor Fingerprint** — profilo fattoriale e confronto benchmark
 """
 )
+
+from src.dashboard.components.analytics import track_visit
+track_visit("home")
