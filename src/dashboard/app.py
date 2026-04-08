@@ -1,7 +1,6 @@
 """ETF X-Ray Engine — Streamlit Dashboard entry point."""
 
 import streamlit as st
-import streamlit_analytics
 
 st.set_page_config(
     page_title="ETF X-Ray Engine",
@@ -9,8 +8,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-streamlit_analytics.start_tracking()
 
 import os
 
@@ -69,5 +66,3 @@ Usa il menu laterale per navigare tra le schermate:
 5. **Factor Fingerprint** — profilo fattoriale e confronto benchmark
 """
 )
-
-streamlit_analytics.stop_tracking(unsafe_password="xray2026")
