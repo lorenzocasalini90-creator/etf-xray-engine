@@ -102,6 +102,9 @@ _ISSUER_FETCHER_MAP: dict[str, str] = {
     "spdr": "SPDRFetcher",
     "state street": "SPDRFetcher",
     "ssga": "SPDRFetcher",
+    "vaneck": "VanEckFetcher",
+    "van eck": "VanEckFetcher",
+    "ubs": "UBSFetcher",
 }
 
 

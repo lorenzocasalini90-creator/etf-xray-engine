@@ -46,6 +46,8 @@ Ritorna probabilità 0.0-1.0, non bool. Usato per routing:
 | Amundi | amundi.py | POST API amundietf.fr | ✅ | — |
 | Invesco | invesco.py | etf-scraper wrapper | ❌ | ✅ |
 | SPDR | spdr.py | etf-scraper wrapper | ❌ | ✅ |
+| VanEck | vaneck.py | Holdings API JSON (2-step: page scrape + dataset) | ✅ | — |
+| UBS | ubs.py | Stub — Akamai WAF + AEM SPA, no public API. Falls through to JustETF | ❌ stub | — |
 | JustETF | justetf.py | justetf-scraping (top 10) | ✅ partial | — |
 
 ### Cross-ETF Matching (src/analytics/_match_key.py)
