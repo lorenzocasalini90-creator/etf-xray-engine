@@ -6,14 +6,22 @@ GA4_ID = "G-E6YX8DRY3Z"
 
 
 def inject_ga4():
-    """Inject Google Analytics 4 tracking code using components.html (JS executes in iframe)."""
-    ga_code = f"""
-    <script async src="https://www.googletagmanager.com/gtag/js?id={GA4_ID}"></script>
+    """Inject GA4 tracking into parent document head, escaping iframe sandbox."""
+    components.html(f"""
     <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){{dataLayer.push(arguments);}}
-        gtag('js', new Date());
-        gtag('config', '{GA4_ID}');
+        // Escape the iframe and inject into parent document
+        if (!window.parent.document.querySelector('script[src*="googletagmanager"]')) {{
+            var script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://www.googletagmanager.com/gtag/js?id={GA4_ID}';
+            window.parent.document.head.appendChild(script);
+
+            script.onload = function() {{
+                window.parent.dataLayer = window.parent.dataLayer || [];
+                function gtag(){{window.parent.dataLayer.push(arguments);}}
+                gtag('js', new Date());
+                gtag('config', '{GA4_ID}');
+            }};
+        }}
     </script>
-    """
-    components.html(ga_code, height=0, width=0)
+    """, height=0, width=0)
