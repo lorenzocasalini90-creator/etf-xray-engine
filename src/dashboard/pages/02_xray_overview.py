@@ -157,17 +157,71 @@ significant = aggregated[aggregated["real_weight_pct"] >= 0.05]
 n_filtered = len(aggregated) - len(significant)
 filtered_weight = aggregated[aggregated["real_weight_pct"] < 0.05]["real_weight_pct"].sum()
 
+_positions = st.session_state.get("portfolio_positions", [])
+_total_eur = sum(p.get("capital", 0) for p in _positions) if _positions else 0
+
 top30 = significant.nlargest(30, "real_weight_pct")[
     ["name", "ticker", "real_weight_pct", "n_etf_sources", "sector", "country"]
 ].copy()
-top30.columns = ["Titolo", "Ticker", "Peso Reale %", "N ETF", "Settore", "Paese"]
-top30["Peso Reale %"] = top30["Peso Reale %"].map(lambda x: f"{x:.2f}")
+
+# Add EUR equivalent column if total invested is available
+if _total_eur > 0:
+    top30.insert(
+        3, "valore_eur",
+        (top30["real_weight_pct"] / 100 * _total_eur).round(0).astype(int),
+    )
+    top30.columns = ["Titolo", "Ticker", "Peso Reale %", "Valore (€)", "N ETF", "Settore", "Paese"]
+    top30["Peso Reale %"] = top30["Peso Reale %"].map(lambda x: f"{x:.2f}")
+    top30["Valore (€)"] = top30["Valore (€)"].map(lambda x: f"€ {x:,}")
+else:
+    top30.columns = ["Titolo", "Ticker", "Peso Reale %", "N ETF", "Settore", "Paese"]
+    top30["Peso Reale %"] = top30["Peso Reale %"].map(lambda x: f"{x:.2f}")
+
 top30 = top30.reset_index(drop=True)
 top30.index = top30.index + 1
 st.dataframe(top30, use_container_width=True)
 if n_filtered > 0:
     st.caption(f"Titoli con peso < 0.05% non mostrati "
                f"({n_filtered} titoli, {filtered_weight:.2f}% del totale).")
+
+# ── EUR breakdown for retail investors ────────────────────────────
+if _total_eur > 0:
+    with st.expander("💶 Il tuo portafoglio, titolo per titolo", expanded=True):
+        st.markdown("Basandosi sui pesi reali, il tuo portafoglio equivale a:")
+
+        _top20_eur = significant.nlargest(20, "real_weight_pct").copy()
+        _top20_eur["valore_eur"] = (
+            _top20_eur["real_weight_pct"] / 100 * _total_eur
+        ).round(0).astype(int)
+
+        items = []
+        for _, r in _top20_eur.iterrows():
+            _name = r.get("name", r.get("ticker", "N/D"))
+            items.append(f"**€{r['valore_eur']:,}** di {_name}")
+
+        col1, col2 = st.columns(2)
+        half = len(items) // 2
+        with col1:
+            for item in items[:half]:
+                st.markdown(f"• {item}")
+        with col2:
+            for item in items[half:]:
+                st.markdown(f"• {item}")
+
+        _top20_pct = _top20_eur["real_weight_pct"].sum()
+        _remaining_pct = 100 - _top20_pct
+        _remaining_eur = int(_remaining_pct / 100 * _total_eur)
+        _n_remaining = len(significant) - 20
+        if _n_remaining > 0:
+            st.caption(
+                f"+ altri {_n_remaining} titoli per circa "
+                f"€{_remaining_eur:,} ({_remaining_pct:.1f}% del totale)"
+            )
+
+        st.caption(
+            "ℹ️ Valori calcolati sui pesi reali aggregati del portafoglio. "
+            "Non rappresentano acquisti diretti di singole azioni."
+        )
 
 # ── Bar chart top 20 ───────────────────────────────────────────────
 with st.expander("📊 Visualizza grafico esposizione (Top 20)", expanded=False):
