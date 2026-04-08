@@ -1,5 +1,7 @@
 import streamlit as st
 from src.dashboard.components.analytics import get_stats
+from src.dashboard.components.ga4 import inject_ga4
+inject_ga4()
 from collections import Counter
 from datetime import datetime
 

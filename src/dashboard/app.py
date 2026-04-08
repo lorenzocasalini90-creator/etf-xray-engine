@@ -10,6 +10,9 @@ st.set_page_config(
 )
 
 import os
+from src.dashboard.components.ga4 import inject_ga4
+
+inject_ga4()
 
 def _load_css():
     css_path = os.path.join(os.path.dirname(__file__), "styles", "global.css")

@@ -12,6 +12,8 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from src.dashboard.components.analytics import track_visit
+from src.dashboard.components.ga4 import inject_ga4
+inject_ga4()
 track_visit("overlap_redundancy")
 
 st.header("🔄 Overlap & Ridondanza")
