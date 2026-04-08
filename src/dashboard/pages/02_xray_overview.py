@@ -179,7 +179,19 @@ else:
 
 top30 = top30.reset_index(drop=True)
 top30.index = top30.index + 1
-st.dataframe(top30, use_container_width=True)
+st.dataframe(
+    top30,
+    use_container_width=True,
+    column_config={
+        "Titolo": st.column_config.TextColumn(width="large"),
+        "Ticker": st.column_config.TextColumn(width="small"),
+        "Peso Reale %": st.column_config.TextColumn(width="small"),
+        "Valore (€)": st.column_config.TextColumn(width="small"),
+        "N ETF": st.column_config.NumberColumn(width="small"),
+        "Settore": st.column_config.TextColumn(width="medium"),
+        "Paese": st.column_config.TextColumn(width="medium"),
+    },
+)
 if n_filtered > 0:
     st.caption(f"Titoli con peso < 0.05% non mostrati "
                f"({n_filtered} titoli, {filtered_weight:.2f}% del totale).")

@@ -5,8 +5,11 @@ import pytest
 
 from src.analytics.enrichment import (
     EXCHANGE_COUNTRY_MAP,
+    STATIC_SECTOR_COUNTRY,
     enrich_missing_data,
     _enrich_from_portfolio_cross_ref,
+    _enrich_from_static_mapping,
+    _normalize_name_for_yfinance,
 )
 
 
@@ -109,6 +112,75 @@ class TestEnrichMissingData:
         result = enrich_missing_data(df)
         assert result.iloc[1]["sector"] == "Technology"
         assert result.iloc[1]["country"] == "United States"
+
+
+class TestStaticMappingEnrichment:
+    """Test static mapping for well-known securities."""
+
+    def test_fills_by_ticker(self):
+        df = _make_df([
+            {"name": "RTX Corp", "ticker": "RTX", "sector": "",
+             "country": "", "real_weight_pct": 3.0},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Industrials"
+        assert df.iloc[0]["country"] == "United States"
+
+    def test_fills_by_name_exact(self):
+        df = _make_df([
+            {"name": "Thales SA", "ticker": "", "sector": "",
+             "country": "", "real_weight_pct": 2.0},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Industrials"
+        assert df.iloc[0]["country"] == "France"
+
+    def test_fills_by_name_partial(self):
+        df = _make_df([
+            {"name": "RHEINMETALL AG ORD", "ticker": "", "sector": "",
+             "country": "Germany", "real_weight_pct": 2.0},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Industrials"
+        # Country already set, should not be overwritten
+        assert df.iloc[0]["country"] == "Germany"
+
+    def test_does_not_overwrite_existing(self):
+        df = _make_df([
+            {"name": "Leonardo SPA", "ticker": "LDO", "sector": "Aerospace",
+             "country": "Italy", "real_weight_pct": 2.0},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Aerospace"
+        assert df.iloc[0]["country"] == "Italy"
+
+    def test_fixes_exchange_country_when_sector_missing(self):
+        """When sector is missing, also fix country (likely exchange-based, not domicile)."""
+        df = _make_df([
+            {"name": "SAFRAN SA", "ticker": "", "sector": "",
+             "country": "Germany", "real_weight_pct": 1.5},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Industrials"
+        # Country overwritten because sector was missing → country was likely from exchange
+        assert df.iloc[0]["country"] == "France"
+
+
+class TestNormalizeNameForYfinance:
+    """Test name-to-ticker normalization."""
+
+    def test_simple_name(self):
+        assert _normalize_name_for_yfinance("Apple Inc") == "APPLE"
+
+    def test_compound_name(self):
+        result = _normalize_name_for_yfinance("Booz Allen Hamilton")
+        assert result == "BOOZ-ALLEN-HAMILTON"
+
+    def test_empty_name(self):
+        assert _normalize_name_for_yfinance("") is None
+
+    def test_strips_suffixes(self):
+        assert _normalize_name_for_yfinance("Thales SA") == "THALES"
 
 
 class TestExchangeCountryMap:
