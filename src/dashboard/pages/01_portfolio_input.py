@@ -330,6 +330,19 @@ if run_analysis:
         and cached_time is not None
     ):
         elapsed_min = (time.time() - cached_time) / 60
+        # Re-enrich cached data so enrichment fixes apply without force-refresh
+        try:
+            from src.analytics.enrichment import enrich_missing_data
+            from src.storage.db import get_session_factory
+
+            _sf = get_session_factory()
+            _sess = _sf()
+            st.session_state.aggregated = enrich_missing_data(
+                st.session_state.aggregated, db_session=_sess,
+            )
+            _sess.close()
+        except Exception:
+            pass
         st.info(
             f"Usando risultati in cache (analizzato {elapsed_min:.0f} minuti fa). "
             "Premi '↺ Aggiorna dati' per forzare il ricalcolo."
