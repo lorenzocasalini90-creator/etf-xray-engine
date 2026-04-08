@@ -7,4 +7,5 @@ python-dotenv>=1.0
 streamlit>=1.30
 plotly>=5.18
 reportlab>=4.0
+streamlit-analytics>=0.4
 justetf-scraping @ git+https://github.com/druzsan/justetf-scraping.git
