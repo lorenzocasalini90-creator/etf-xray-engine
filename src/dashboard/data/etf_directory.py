@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import os
-from functools import lru_cache
+from pathlib import Path
 
 import pandas as pd
+import streamlit as st
 
 
-_CSV_PATH = os.path.join(os.path.dirname(__file__), "etf_directory.csv")
+_CSV_PATH = Path(__file__).parent / "etf_directory.csv"
 
 
-@lru_cache(maxsize=1)
+@st.cache_data
 def load_directory() -> pd.DataFrame:
-    """Load the ETF directory CSV (cached in memory)."""
+    """Load the ETF directory CSV (cached via Streamlit)."""
     return pd.read_csv(_CSV_PATH, dtype=str).fillna("")
 
 
