@@ -48,101 +48,115 @@ def _save_yfinance_cache(cache: dict[str, dict]) -> None:
         logger.warning("Failed to save yfinance cache: %s", exc)
 
 
-# Static mapping for well-known securities where yfinance may fail
+# Common suffixes to strip when normalizing holding names for matching
+_NAME_SUFFIXES = (
+    " INC.", " INC", " CORP.", " CORP", " PLC", " LTD.", " LTD",
+    " SA", " AG", " SE", " SPA", " NV", " AB", " ASA",
+    " CO.", " CO", " GROUP", " HOLDINGS", " HOLDING",
+    " CLASS A", " CLASS B", " CLASS C", " CL A", " CL B", " CL C",
+    " ORD", " REGISTERED", " COMMON STOCK", ", INC.", ", INC",
+    ", LTD.", ", LTD", ",", ".",
+)
+
+
+def _normalize_holding_name(name: str) -> str:
+    """Normalize a holding name for matching: uppercase, strip suffixes."""
+    clean = name.upper().strip()
+    # Iteratively strip suffixes (order matters — strip longer first)
+    changed = True
+    while changed:
+        changed = False
+        for suffix in _NAME_SUFFIXES:
+            if clean.endswith(suffix):
+                clean = clean[: -len(suffix)].strip()
+                changed = True
+    return clean
+
+
+# Static mapping for well-known securities where yfinance may fail.
+# Keys are NORMALIZED (uppercase, no suffixes). Matching is done via
+# _normalize_holding_name() so "Thales SA", "THALES", "Thales" all match.
 STATIC_SECTOR_COUNTRY: dict[str, tuple[str, str]] = {
     # Defense / Aerospace
     "RTX": ("Industrials", "United States"),
-    "RTX CORP": ("Industrials", "United States"),
     "RAYTHEON": ("Industrials", "United States"),
     "THALES": ("Industrials", "France"),
-    "THALES SA": ("Industrials", "France"),
     "LEONARDO": ("Industrials", "Italy"),
-    "LEONARDO SPA": ("Industrials", "Italy"),
     "SAAB": ("Industrials", "Sweden"),
-    "SAAB AB": ("Industrials", "Sweden"),
-    "HANWHA": ("Industrials", "South Korea"),
     "HANWHA AEROSPACE": ("Industrials", "South Korea"),
     "HANWHA SYSTEMS": ("Industrials", "South Korea"),
+    "HANWHA": ("Industrials", "South Korea"),
     "RHEINMETALL": ("Industrials", "Germany"),
-    "RHEINMETALL AG": ("Industrials", "Germany"),
     "BAE SYSTEMS": ("Industrials", "United Kingdom"),
-    "BAE SYSTEMS PLC": ("Industrials", "United Kingdom"),
     "NORTHROP GRUMMAN": ("Industrials", "United States"),
-    "NORTHROP GRUMMAN CORP": ("Industrials", "United States"),
     "LOCKHEED MARTIN": ("Industrials", "United States"),
-    "LOCKHEED MARTIN CORP": ("Industrials", "United States"),
     "GENERAL DYNAMICS": ("Industrials", "United States"),
-    "GENERAL DYNAMICS CORP": ("Industrials", "United States"),
     "L3HARRIS": ("Industrials", "United States"),
     "L3HARRIS TECHNOLOGIES": ("Industrials", "United States"),
     "ELBIT SYSTEMS": ("Industrials", "Israel"),
-    "PALANTIR": ("Technology", "United States"),
-    "PALANTIR TECHNOLOGIES": ("Technology", "United States"),
+    "PALANTIR": ("Information Technology", "United States"),
+    "PALANTIR TECHNOLOGIES": ("Information Technology", "United States"),
     "BOOZ ALLEN": ("Industrials", "United States"),
     "BOOZ ALLEN HAMILTON": ("Industrials", "United States"),
     "ROLLS-ROYCE": ("Industrials", "United Kingdom"),
-    "ROLLS-ROYCE HOLDINGS": ("Industrials", "United Kingdom"),
     "SAFRAN": ("Industrials", "France"),
-    "SAFRAN SA": ("Industrials", "France"),
     "KONGSBERG": ("Industrials", "Norway"),
     "KONGSBERG GRUPPEN": ("Industrials", "Norway"),
     "CURTISS-WRIGHT": ("Industrials", "United States"),
-    "CURTISS-WRIGHT CORP": ("Industrials", "United States"),
     "TEXTRON": ("Industrials", "United States"),
-    "TEXTRON INC": ("Industrials", "United States"),
     "HOWMET AEROSPACE": ("Industrials", "United States"),
     "LEIDOS": ("Industrials", "United States"),
     "LEIDOS HOLDINGS": ("Industrials", "United States"),
     "HENSOLDT": ("Industrials", "Germany"),
-    "HENSOLDT AG": ("Industrials", "Germany"),
     "DASSAULT AVIATION": ("Industrials", "France"),
-    "DASSAULT AVIATION SA": ("Industrials", "France"),
     "BABCOCK": ("Industrials", "United Kingdom"),
     "BABCOCK INTERNATIONAL": ("Industrials", "United Kingdom"),
     "CAE": ("Industrials", "Canada"),
-    "CAE INC": ("Industrials", "Canada"),
     "CHEMRING": ("Industrials", "United Kingdom"),
-    "CHEMRING GROUP": ("Industrials", "United Kingdom"),
     "QINETIQ": ("Industrials", "United Kingdom"),
-    "QINETIQ GROUP": ("Industrials", "United Kingdom"),
+    "LUMENTUM": ("Information Technology", "United States"),
+    "LUMENTUM HOLDINGS": ("Information Technology", "United States"),
+    "PALO ALTO NETWORKS": ("Information Technology", "United States"),
     # Energy / Oil & Gas
     "EXXON MOBIL": ("Energy", "United States"),
-    "EXXON MOBIL CORP": ("Energy", "United States"),
     "CHEVRON": ("Energy", "United States"),
-    "CHEVRON CORP": ("Energy", "United States"),
     "SHELL": ("Energy", "United Kingdom"),
-    "SHELL PLC": ("Energy", "United Kingdom"),
     "TOTALENERGIES": ("Energy", "France"),
-    "TOTALENERGIES SE": ("Energy", "France"),
     "BP": ("Energy", "United Kingdom"),
-    "BP PLC": ("Energy", "United Kingdom"),
     "CONOCOPHILLIPS": ("Energy", "United States"),
     "ENI": ("Energy", "Italy"),
-    "ENI SPA": ("Energy", "Italy"),
     "EQUINOR": ("Energy", "Norway"),
-    "EQUINOR ASA": ("Energy", "Norway"),
     "SCHLUMBERGER": ("Energy", "United States"),
     "SLB": ("Energy", "United States"),
-    # Tech
-    "APPLE": ("Technology", "United States"),
-    "APPLE INC": ("Technology", "United States"),
-    "MICROSOFT": ("Technology", "United States"),
-    "MICROSOFT CORP": ("Technology", "United States"),
-    "NVIDIA": ("Technology", "United States"),
-    "NVIDIA CORP": ("Technology", "United States"),
+    "CANADIAN NATURAL": ("Energy", "Canada"),
+    "CANADIAN NATURAL RESOURCES": ("Energy", "Canada"),
+    "EOG RESOURCES": ("Energy", "United States"),
+    "CORTEVA": ("Materials", "United States"),
+    "CORTEVA AGRISCIENCE": ("Materials", "United States"),
+    "ARCHER-DANIELS-MIDLAND": ("Consumer Staples", "United States"),
+    "ARCHER DANIELS MIDLAND": ("Consumer Staples", "United States"),
+    # Tech / Information Technology
+    "APPLE": ("Information Technology", "United States"),
+    "MICROSOFT": ("Information Technology", "United States"),
+    "NVIDIA": ("Information Technology", "United States"),
     "ALPHABET": ("Communication Services", "United States"),
-    "AMAZON": ("Consumer Cyclical", "United States"),
-    "AMAZON.COM": ("Consumer Cyclical", "United States"),
+    "AMAZON": ("Consumer Discretionary", "United States"),
+    "AMAZON.COM": ("Consumer Discretionary", "United States"),
     "META PLATFORMS": ("Communication Services", "United States"),
-    "TESLA": ("Consumer Cyclical", "United States"),
-    "TESLA INC": ("Consumer Cyclical", "United States"),
-    "BROADCOM": ("Technology", "United States"),
-    "BROADCOM INC": ("Technology", "United States"),
-    "TAIWAN SEMICONDUCTOR": ("Technology", "Taiwan"),
-    "TSMC": ("Technology", "Taiwan"),
-    "SAMSUNG ELECTRONICS": ("Technology", "South Korea"),
-    "ASML": ("Technology", "Netherlands"),
-    "ASML HOLDING": ("Technology", "Netherlands"),
+    "TESLA": ("Consumer Discretionary", "United States"),
+    "BROADCOM": ("Information Technology", "United States"),
+    "TAIWAN SEMICONDUCTOR": ("Information Technology", "Taiwan"),
+    "TAIWAN SEMICONDUCTOR MANUFACTURING": ("Information Technology", "Taiwan"),
+    "TSMC": ("Information Technology", "Taiwan"),
+    "SAMSUNG ELECTRONICS": ("Information Technology", "South Korea"),
+    "ASML": ("Information Technology", "Netherlands"),
+    "ASML HOLDING": ("Information Technology", "Netherlands"),
+    "LAM RESEARCH": ("Information Technology", "United States"),
+    "ANALOG DEVICES": ("Information Technology", "United States"),
+    "TERADYNE": ("Information Technology", "United States"),
+    "INFINEON": ("Information Technology", "Germany"),
+    "INFINEON TECHNOLOGIES": ("Information Technology", "Germany"),
+    "COGNEX": ("Information Technology", "United States"),
 }
 
 # Hardcoded exchange code → country mapping for major markets
@@ -215,23 +229,33 @@ def enrich_missing_data(
         if col in result.columns:
             result[col] = result[col].fillna("").astype(str)
 
+    # Diagnostic: log top 20 holdings BEFORE enrichment
+    if logger.isEnabledFor(logging.DEBUG):
+        top20_before = result.nlargest(20, "real_weight_pct")[
+            ["name", "ticker", "sector", "country"]
+        ] if "real_weight_pct" in result.columns else result.head(20)
+        logger.debug("BEFORE enrichment (top 20):\n%s", top20_before.to_string())
+
     # Step 1: Cross-reference from other holdings in the portfolio
     _enrich_from_portfolio_cross_ref(result)
 
-    # Step 2: DB lookup (figi_mapping + security_fundamentals)
-    if db_session is not None:
-        _enrich_from_db(result, db_session)
-
-    # Step 3: Static mapping for well-known securities
+    # Step 2: Static mapping for well-known securities
     _enrich_from_static_mapping(result)
 
-    # Step 4: yfinance for top holdings still missing data
+    # Step 3: yfinance for top holdings still missing data
     _enrich_from_yfinance(result, top_n=yfinance_top_n)
 
     # Normalize empty strings back to "Unknown" for display
     for col in ("sector", "country"):
         if col in result.columns:
             result[col] = result[col].replace("", "Unknown")
+
+    # Diagnostic: log top 20 holdings AFTER enrichment
+    if logger.isEnabledFor(logging.DEBUG):
+        top20_after = result.nlargest(20, "real_weight_pct")[
+            ["name", "ticker", "sector", "country"]
+        ] if "real_weight_pct" in result.columns else result.head(20)
+        logger.debug("AFTER enrichment (top 20):\n%s", top20_after.to_string())
 
     return result
 
@@ -335,9 +359,14 @@ def _enrich_from_db(df: pd.DataFrame, session: Session) -> None:
 def _enrich_from_static_mapping(df: pd.DataFrame) -> None:
     """Fill missing sector/country from static mapping of well-known securities.
 
-    When sector is missing, we also overwrite country even if set, because
-    fetchers often report the exchange country (e.g. "Germany" for Xetra)
-    instead of the company's domicile country.
+    Matching strategy (in order):
+    1. Exact match on ticker (uppercase)
+    2. Exact match on normalized name (uppercase, suffixes stripped)
+    3. Substring: any mapping key contained in the normalized name
+
+    When sector is missing, we also overwrite country even if already set,
+    because fetchers often report the exchange country (e.g. "Germany" for
+    Xetra listings) instead of the company's domicile country.
     """
     filled_sector = 0
     filled_country = 0
@@ -351,20 +380,23 @@ def _enrich_from_static_mapping(df: pd.DataFrame) -> None:
         if not needs_sector and not needs_country:
             continue
 
-        # Try matching by ticker, then by name (exact and partial)
-        name = str(row.get("name", "")).strip().upper()
+        raw_name = str(row.get("name", "")).strip()
         ticker = str(row.get("ticker", "")).strip().upper()
+        norm_name = _normalize_holding_name(raw_name)
 
-        match = None
-        if ticker and ticker in STATIC_SECTOR_COUNTRY:
-            match = STATIC_SECTOR_COUNTRY[ticker]
-        elif name and name in STATIC_SECTOR_COUNTRY:
-            match = STATIC_SECTOR_COUNTRY[name]
-        else:
-            # Partial name match: check if any key is contained in the name
-            for key, val in STATIC_SECTOR_COUNTRY.items():
-                if len(key) >= 4 and key in name:
-                    match = val
+        # 1. Exact ticker match
+        match = STATIC_SECTOR_COUNTRY.get(ticker) if ticker else None
+
+        # 2. Exact normalized-name match
+        if match is None and norm_name:
+            match = STATIC_SECTOR_COUNTRY.get(norm_name)
+
+        # 3. Substring: any mapping key found inside the normalized name
+        if match is None and norm_name and len(norm_name) >= 3:
+            # Sort keys longest-first so more specific keys win
+            for key in sorted(STATIC_SECTOR_COUNTRY, key=len, reverse=True):
+                if len(key) >= 3 and key in norm_name:
+                    match = STATIC_SECTOR_COUNTRY[key]
                     break
 
         if match:

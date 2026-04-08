@@ -9,6 +9,7 @@ from src.analytics.enrichment import (
     enrich_missing_data,
     _enrich_from_portfolio_cross_ref,
     _enrich_from_static_mapping,
+    _normalize_holding_name,
     _normalize_name_for_yfinance,
 )
 
@@ -113,6 +114,62 @@ class TestEnrichMissingData:
         assert result.iloc[1]["sector"] == "Technology"
         assert result.iloc[1]["country"] == "United States"
 
+    def test_static_mapping_fills_via_enrich(self):
+        """Integration: static mapping fills sector+country via enrich_missing_data."""
+        df = _make_df([
+            {"name": "RTX", "ticker": "", "sector": "",
+             "country": "Germany", "real_weight_pct": 5.0},
+        ])
+        result = enrich_missing_data(df)
+        assert result.iloc[0]["sector"] == "Industrials"
+        assert result.iloc[0]["country"] == "United States"
+
+
+class TestNormalizeHoldingName:
+    """Test the name normalization for static matching."""
+
+    def test_strips_inc(self):
+        assert _normalize_holding_name("Apple Inc") == "APPLE"
+        assert _normalize_holding_name("Apple Inc.") == "APPLE"
+
+    def test_strips_corp(self):
+        assert _normalize_holding_name("NVIDIA Corp.") == "NVIDIA"
+        assert _normalize_holding_name("RTX Corp") == "RTX"
+
+    def test_strips_sa(self):
+        assert _normalize_holding_name("Thales SA") == "THALES"
+
+    def test_strips_spa(self):
+        assert _normalize_holding_name("Leonardo SpA") == "LEONARDO"
+
+    def test_strips_ag(self):
+        assert _normalize_holding_name("Rheinmetall AG") == "RHEINMETALL"
+
+    def test_strips_comma_ltd(self):
+        assert _normalize_holding_name("HANWHA AEROSPACE Co., Ltd.") == "HANWHA AEROSPACE"
+        assert _normalize_holding_name("Taiwan Semiconductor Manufacturing Co., Ltd.") == "TAIWAN SEMICONDUCTOR MANUFACTURING"
+
+    def test_strips_comma_inc(self):
+        assert _normalize_holding_name("Palantir Technologies, Inc.") == "PALANTIR TECHNOLOGIES"
+        assert _normalize_holding_name("Teradyne, Inc.") == "TERADYNE"
+
+    def test_strips_nv(self):
+        assert _normalize_holding_name("ASML Holding NV") == "ASML"
+
+    def test_strips_holdings(self):
+        assert _normalize_holding_name("Lumentum Holdings") == "LUMENTUM"
+        assert _normalize_holding_name("Leidos Holdings") == "LEIDOS"
+
+    def test_empty(self):
+        assert _normalize_holding_name("") == ""
+
+    def test_no_suffix(self):
+        assert _normalize_holding_name("RTX") == "RTX"
+
+    def test_complex_suffix_chain(self):
+        """Multiple suffixes stripped iteratively."""
+        assert _normalize_holding_name("Archer-Daniels-Midland Co.") == "ARCHER-DANIELS-MIDLAND"
+
 
 class TestStaticMappingEnrichment:
     """Test static mapping for well-known securities."""
@@ -126,7 +183,8 @@ class TestStaticMappingEnrichment:
         assert df.iloc[0]["sector"] == "Industrials"
         assert df.iloc[0]["country"] == "United States"
 
-    def test_fills_by_name_exact(self):
+    def test_fills_by_normalized_name(self):
+        """'Thales SA' normalizes to 'THALES' which is in the mapping."""
         df = _make_df([
             {"name": "Thales SA", "ticker": "", "sector": "",
              "country": "", "real_weight_pct": 2.0},
@@ -135,17 +193,72 @@ class TestStaticMappingEnrichment:
         assert df.iloc[0]["sector"] == "Industrials"
         assert df.iloc[0]["country"] == "France"
 
-    def test_fills_by_name_partial(self):
+    def test_fills_leonardo_spa(self):
+        df = _make_df([
+            {"name": "Leonardo SpA", "ticker": "", "sector": "",
+             "country": "Germany", "real_weight_pct": 2.0},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Industrials"
+        assert df.iloc[0]["country"] == "Italy"
+
+    def test_fills_nvidia_corp_dot(self):
+        """NVIDIA Corp. → normalized NVIDIA → match."""
+        df = _make_df([
+            {"name": "NVIDIA Corp.", "ticker": "", "sector": "",
+             "country": "Germany", "real_weight_pct": 4.0},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Information Technology"
+        assert df.iloc[0]["country"] == "United States"
+
+    def test_fills_hanwha_co_ltd(self):
+        df = _make_df([
+            {"name": "HANWHA AEROSPACE Co., Ltd.", "ticker": "", "sector": "",
+             "country": "Germany", "real_weight_pct": 1.5},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Industrials"
+        assert df.iloc[0]["country"] == "South Korea"
+
+    def test_fills_palantir_inc(self):
+        df = _make_df([
+            {"name": "Palantir Technologies, Inc.", "ticker": "", "sector": "",
+             "country": "Germany", "real_weight_pct": 1.5},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Information Technology"
+        assert df.iloc[0]["country"] == "United States"
+
+    def test_fills_tsmc_long_name(self):
+        df = _make_df([
+            {"name": "Taiwan Semiconductor Manufacturing Co., Ltd.", "ticker": "",
+             "sector": "", "country": "Germany", "real_weight_pct": 3.0},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Information Technology"
+        assert df.iloc[0]["country"] == "Taiwan"
+
+    def test_fills_asml_holding_nv(self):
+        df = _make_df([
+            {"name": "ASML Holding NV", "ticker": "", "sector": "",
+             "country": "Netherlands", "real_weight_pct": 2.0},
+        ])
+        _enrich_from_static_mapping(df)
+        assert df.iloc[0]["sector"] == "Information Technology"
+
+    def test_fills_by_substring(self):
+        """Name contains a mapping key as substring."""
         df = _make_df([
             {"name": "RHEINMETALL AG ORD", "ticker": "", "sector": "",
              "country": "Germany", "real_weight_pct": 2.0},
         ])
         _enrich_from_static_mapping(df)
         assert df.iloc[0]["sector"] == "Industrials"
-        # Country already set, should not be overwritten
+        # Country overwritten because sector was missing
         assert df.iloc[0]["country"] == "Germany"
 
-    def test_does_not_overwrite_existing(self):
+    def test_does_not_overwrite_existing_sector_and_country(self):
         df = _make_df([
             {"name": "Leonardo SPA", "ticker": "LDO", "sector": "Aerospace",
              "country": "Italy", "real_weight_pct": 2.0},
@@ -162,8 +275,39 @@ class TestStaticMappingEnrichment:
         ])
         _enrich_from_static_mapping(df)
         assert df.iloc[0]["sector"] == "Industrials"
-        # Country overwritten because sector was missing → country was likely from exchange
         assert df.iloc[0]["country"] == "France"
+
+    def test_all_user_reported_names(self):
+        """All names from the user's bug report should match."""
+        test_cases = [
+            ("RTX", "Industrials", "United States"),
+            ("Thales SA", "Industrials", "France"),
+            ("Leonardo SpA", "Industrials", "Italy"),
+            ("SAAB", "Industrials", "Sweden"),
+            ("Palo Alto Networks", "Information Technology", "United States"),
+            ("NVIDIA Corp.", "Information Technology", "United States"),
+            ("Lumentum Holdings", "Information Technology", "United States"),
+            ("Elbit Systems", "Industrials", "Israel"),
+            ("Curtiss-Wright", "Industrials", "United States"),
+            ("Leidos Holdings", "Industrials", "United States"),
+            ("ConocoPhillips", "Energy", "United States"),
+            ("ASML Holding NV", "Information Technology", "Netherlands"),
+            ("Analog Devices", "Information Technology", "United States"),
+            ("Cognex", "Information Technology", "United States"),
+            ("Infineon Technologies AG", "Information Technology", "Germany"),
+        ]
+        for name, expected_sector, expected_country in test_cases:
+            df = _make_df([
+                {"name": name, "ticker": "", "sector": "",
+                 "country": "Germany", "real_weight_pct": 2.0},
+            ])
+            _enrich_from_static_mapping(df)
+            assert df.iloc[0]["sector"] == expected_sector, (
+                f"Failed for {name}: expected sector={expected_sector}, got={df.iloc[0]['sector']}"
+            )
+            assert df.iloc[0]["country"] == expected_country, (
+                f"Failed for {name}: expected country={expected_country}, got={df.iloc[0]['country']}"
+            )
 
 
 class TestNormalizeNameForYfinance:
