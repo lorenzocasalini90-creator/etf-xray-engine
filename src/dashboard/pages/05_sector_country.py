@@ -55,13 +55,22 @@ with col_s:
         values="weight_pct",
         hole=0.35,
     )
-    fig_s.update_traces(textinfo="label+percent", textposition="outside")
-    fig_s.update_layout(showlegend=False, height=450)
+    fig_s.update_traces(
+        textposition="outside",
+        textinfo="label+percent",
+        textfont_size=11,
+        insidetextorientation="horizontal",
+    )
+    fig_s.update_layout(
+        showlegend=False,
+        height=500,
+        margin=dict(l=20, r=20, t=40, b=20),
+    )
     st.plotly_chart(fig_s, use_container_width=True)
 
 with col_c:
     st.subheader("Esposizione per Paese")
-    top_countries = country_df.head(15)
+    top_countries = country_df.head(10)
     fig_c = px.bar(
         top_countries,
         x="weight_pct",
@@ -70,8 +79,15 @@ with col_c:
         labels={"weight_pct": "Peso (%)", "country": ""},
         color="weight_pct",
         color_continuous_scale="Viridis",
+        text=top_countries["weight_pct"].round(1).astype(str) + "%",
     )
-    fig_c.update_layout(yaxis=dict(autorange="reversed"), showlegend=False, height=450)
+    fig_c.update_traces(textposition="outside")
+    fig_c.update_layout(
+        yaxis=dict(autorange="reversed"),
+        showlegend=False,
+        height=450,
+        xaxis=dict(range=[0, top_countries["weight_pct"].max() * 1.15]),
+    )
     st.plotly_chart(fig_c, use_container_width=True)
 
 # ── Benchmark deviation bars ────────────────────────────────────────
@@ -145,7 +161,15 @@ fig_sun = px.sunburst(
     color="real_weight_pct",
     color_continuous_scale="Blues",
 )
-fig_sun.update_layout(height=600)
+fig_sun.update_traces(
+    textinfo="label",
+    insidetextorientation="radial",
+    textfont_size=10,
+)
+fig_sun.update_layout(
+    height=650,
+    margin=dict(l=10, r=10, t=40, b=10),
+)
 st.plotly_chart(fig_sun, use_container_width=True)
 
 # ── Footer ─────────────────────────────────────────────────────────

@@ -28,12 +28,17 @@ import plotly.express as px
 if 'real_weight_pct' in redundancy_df.columns:
     redundancy_df['real_weight_pct'] = pd.to_numeric(redundancy_df['real_weight_pct'], errors='coerce').fillna(0.0)
 
+from src.dashboard.components.display_utils import get_display_name
+
+redundancy_df = redundancy_df.copy()
+redundancy_df["display_name"] = redundancy_df["etf_ticker"].map(get_display_name)
+
 # ── Horizontal bar chart ────────────────────────────────────────────
 from src.dashboard.styles.colors import GREEN_LIGHT, RED_LIGHT, YELLOW_LIGHT
 
 # Summary box
-_red_scores = dict(zip(redundancy_df["etf_ticker"], redundancy_df["redundancy_pct"] / 100))
-_ter_wasted_all = dict(zip(redundancy_df["etf_ticker"], redundancy_df["ter_wasted"].fillna(0)))
+_red_scores = dict(zip(redundancy_df["display_name"], redundancy_df["redundancy_pct"] / 100))
+_ter_wasted_all = dict(zip(redundancy_df["display_name"], redundancy_df["ter_wasted"].fillna(0)))
 _total_ter_wasted = sum(_ter_wasted_all.values())
 _max_redundant = max(_red_scores, key=_red_scores.get) if _red_scores else ""
 _max_r = _red_scores.get(_max_redundant, 0)
@@ -63,9 +68,9 @@ colors = redundancy_df["verdict"].map(color_map).tolist()
 fig = px.bar(
     redundancy_df,
     x="redundancy_pct",
-    y="etf_ticker",
+    y="display_name",
     orientation="h",
-    labels={"redundancy_pct": "Redundancy (%)", "etf_ticker": "ETF"},
+    labels={"redundancy_pct": "Redundancy (%)", "display_name": "ETF"},
     text=redundancy_df["redundancy_pct"].map(lambda v: f"{v:.1f}%"),
 )
 fig.update_traces(marker_color=colors, textposition="outside")
@@ -89,7 +94,7 @@ with st.expander("ℹ️ Cos'è il Redundancy Score?"):
 # ── TER wasted ──────────────────────────────────────────────────────
 st.subheader("TER sprecato per ridondanza")
 for _, row in redundancy_df.iterrows():
-    ticker = row["etf_ticker"]
+    ticker = row["display_name"]
     ter = row.get("ter_wasted", 0) or 0
     verdict = row["verdict"]
     icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(verdict, "⚪")

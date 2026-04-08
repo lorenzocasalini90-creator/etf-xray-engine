@@ -32,9 +32,11 @@ if aggregated is not None and 'real_weight_pct' in aggregated.columns:
     aggregated['real_weight_pct'] = pd.to_numeric(aggregated['real_weight_pct'], errors='coerce').fillna(0.0)
 
 from src.analytics.overlap import shared_holdings
+from src.dashboard.components.display_utils import get_display_name, map_display_names
 
 # ── Heatmap ─────────────────────────────────────────────────────────
-labels = overlap_mat.columns.tolist()
+raw_labels = overlap_mat.columns.tolist()
+labels = map_display_names(raw_labels)
 z = overlap_mat.values.tolist()
 
 # Annotate with % values
@@ -66,13 +68,19 @@ with st.expander("ℹ️ Cos'è l'Overlap?"):
 # ── Shared holdings detail ──────────────────────────────────────────
 st.subheader("Dettaglio titoli in comune")
 tickers = list(holdings_db.keys())
+display_tickers = map_display_names(tickers)
 if len(tickers) >= 2:
     col1, col2 = st.columns(2)
     with col1:
-        etf_a = st.selectbox("ETF A", tickers, index=0)
+        etf_a_display = st.selectbox("ETF A", display_tickers, index=0)
     with col2:
-        default_b = 1 if len(tickers) > 1 else 0
-        etf_b = st.selectbox("ETF B", tickers, index=default_b)
+        default_b = 1 if len(display_tickers) > 1 else 0
+        etf_b_display = st.selectbox("ETF B", display_tickers, index=default_b)
+
+    # Map display names back to raw identifiers for data lookup
+    _display_to_raw = dict(zip(display_tickers, tickers))
+    etf_a = _display_to_raw[etf_a_display]
+    etf_b = _display_to_raw[etf_b_display]
 
     if etf_a != etf_b and etf_a in holdings_db and etf_b in holdings_db:
         shared = shared_holdings(holdings_db[etf_a], holdings_db[etf_b])
@@ -80,13 +88,13 @@ if len(tickers) >= 2:
             st.info("Nessun titolo in comune.")
         else:
             display = shared[["name", "weight_a", "weight_b", "weight_diff"]].copy()
-            display.columns = ["Titolo", f"Peso {etf_a} %", f"Peso {etf_b} %", "Delta %"]
+            display.columns = ["Titolo", f"Peso {etf_a_display} %", f"Peso {etf_b_display} %", "Delta %"]
             for c in display.columns[1:]:
                 display[c] = display[c].map(lambda x: f"{x:.2f}")
             display = display.head(30).reset_index(drop=True)
             display.index = display.index + 1
             st.dataframe(display, use_container_width=True)
-    elif etf_a == etf_b:
+    elif etf_a_display == etf_b_display:
         st.warning("Seleziona due ETF diversi.")
 
 # ── Unique exposure analysis ───────────────────────────────────────
@@ -94,13 +102,16 @@ from src.analytics.overlap import compute_unique_exposure
 
 st.subheader("🔍 Analisi: cosa perdi rimuovendo un ETF?")
 tickers_all = list(holdings_db.keys())
+display_tickers_all = map_display_names(tickers_all)
 
 if len(tickers_all) >= 2:
-    target = st.selectbox(
+    target_display = st.selectbox(
         "Seleziona ETF da analizzare",
-        tickers_all,
+        display_tickers_all,
         key="unique_exposure_target",
     )
+    _display_to_raw_all = dict(zip(display_tickers_all, tickers_all))
+    target = _display_to_raw_all[target_display]
 
     if target:
         ue = compute_unique_exposure(target, holdings_db)
@@ -108,26 +119,26 @@ if len(tickers_all) >= 2:
         unique_pct = ue["total_unique_pct"]
         unique_count = ue["unique_holdings_count"]
         total_h = ue["total_holdings"]
-        main_etf = ue["main_covering_etf"]
+        main_etf = get_display_name(ue["main_covering_etf"])
 
         if unique_pct < 5:
             st.success(
-                f"Rimuovendo **{target}**: impatto minimo — "
-                f"{target} è ampiamente ridondante. Rimozione suggerita.\n\n"
+                f"Rimuovendo **{target_display}**: impatto minimo — "
+                f"{target_display} è ampiamente ridondante. Rimozione suggerita.\n\n"
                 f"• Esposizione unica: **{unique_pct:.1f}%** su {unique_count} titoli\n"
                 f"• La maggior parte già coperta da: **{main_etf}**"
             )
         elif unique_pct < 15:
             st.warning(
-                f"Rimuovendo **{target}**: impatto moderato — "
+                f"Rimuovendo **{target_display}**: impatto moderato — "
                 f"valuta se l'esposizione unica giustifica il TER.\n\n"
                 f"• Esposizione unica: **{unique_pct:.1f}%** su {unique_count} titoli\n"
                 f"• La maggior parte già coperta da: **{main_etf}**"
             )
         else:
             st.error(
-                f"Rimuovendo **{target}**: impatto significativo — "
-                f"{target} contribuisce esposizione difficilmente sostituibile.\n\n"
+                f"Rimuovendo **{target_display}**: impatto significativo — "
+                f"{target_display} contribuisce esposizione difficilmente sostituibile.\n\n"
                 f"• Esposizione unica: **{unique_pct:.1f}%** su {unique_count} titoli\n"
                 f"• La maggior parte già coperta da: **{main_etf}**"
             )
@@ -139,11 +150,15 @@ if len(tickers_all) >= 2:
                  "unique_weight_pct", "covered_by_etf"]
             ].copy()
             display_detail.columns = [
-                "Titolo", f"Peso in {target} %", "Coperto da altri %",
+                "Titolo", f"Peso in {target_display} %", "Coperto da altri %",
                 "Unico %", "Coperto da",
             ]
-            for c in [f"Peso in {target} %", "Coperto da altri %", "Unico %"]:
+            for c in [f"Peso in {target_display} %", "Coperto da altri %", "Unico %"]:
                 display_detail[c] = display_detail[c].map(lambda x: f"{x:.2f}")
+            # Map raw identifiers in "Coperto da" column to display names
+            display_detail["Coperto da"] = display_detail["Coperto da"].map(
+                lambda x: get_display_name(x) if isinstance(x, str) else x
+            )
             st.dataframe(display_detail, use_container_width=True, hide_index=True)
 else:
     st.info("Servono almeno 2 ETF per l'analisi di esposizione unica.")
