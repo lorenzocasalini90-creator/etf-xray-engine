@@ -156,11 +156,14 @@ class TestWeightsSum:
 
 
 class TestUcitsFallback:
-    def test_ucits_raises_not_implemented(
+    def test_ucits_proxied_via_us_ticker(
         self, fetcher: VanguardFetcher
     ) -> None:
-        with pytest.raises(NotImplementedError, match="UCITS"):
-            fetcher.fetch_holdings("VWCE")
+        from unittest.mock import MagicMock
+        fetcher._scraper = MagicMock()
+        fetcher._scraper.query_holdings.return_value = SAMPLE_SCRAPER_DF.copy()
+        df = fetcher.fetch_holdings("VWCE")
+        assert (df["etf_ticker"] == "VWCE").all()
 
     def test_unknown_raises_value_error(
         self, fetcher: VanguardFetcher

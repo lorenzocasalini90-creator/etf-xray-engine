@@ -21,11 +21,32 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 BACKOFF_BASE = 2.0
 
-# Known UCITS tickers — recognised by can_handle but not yet fetchable
+# Known UCITS tickers — recognised by can_handle
 UCITS_TICKERS: frozenset[str] = frozenset({
     "VWCE", "VUSA", "VEVE", "VFEM", "VUAA", "VWRL",
     "VHYL", "VNRT", "VGVF", "VVAL", "VMOM",
 })
+
+# UCITS ISIN → US-equivalent ticker for proxy fetching via etf-scraper
+VANGUARD_UCITS_TO_US: dict[str, str] = {
+    "IE00BK5BQT80": "VT",     # VWCE → Vanguard Total World
+    "IE00B3XXRP09": "VOO",    # VUSA → S&P 500
+    "IE00B8GKDB10": "VYM",    # VHYL → High Dividend Yield
+    "IE00BGL86Z12": "VEA",    # VEUR → FTSE Developed Europe
+    "IE00B3RBWM25": "VWO",    # VFEM → FTSE Emerging Markets
+    "IE00B810Q511": "VGK",    # VEUR → Europe
+}
+
+# Reverse: UCITS ticker → US ticker
+_UCITS_TICKER_TO_US: dict[str, str] = {
+    "VWCE": "VT",
+    "VWRL": "VT",
+    "VUSA": "VOO",
+    "VUAA": "VOO",
+    "VHYL": "VYM",
+    "VEVE": "VEA",
+    "VFEM": "VWO",
+}
 
 # Asset classes to exclude
 _NON_EQUITY_CLASSES = frozenset({
@@ -74,6 +95,8 @@ class VanguardFetcher(BaseFetcher):
         ticker = identifier.upper().strip()
         if ticker in self._scraper_tickers or ticker in UCITS_TICKERS:
             return 1.0
+        if ticker in VANGUARD_UCITS_TO_US:
+            return 0.95
         if len(ticker) == 12 and ticker.startswith("IE") and ticker.isalnum():
             return 0.3
         return 0.0
@@ -92,20 +115,15 @@ class VanguardFetcher(BaseFetcher):
         """
         ticker = identifier.upper().strip()
 
-        if ticker in self._scraper_tickers:
+        # Check UCITS→US proxy mapping (ISIN or ticker)
+        us_proxy = VANGUARD_UCITS_TO_US.get(ticker) or _UCITS_TICKER_TO_US.get(ticker)
+
+        if us_proxy and self._scraper:
+            logger.info("Proxying UCITS %s via US ticker %s (vanguard_us_proxy)", ticker, us_proxy)
+            df = self._fetch_via_scraper(us_proxy, as_of_date)
+            df["etf_ticker"] = ticker  # Label with original UCITS identifier
+        elif ticker in self._scraper_tickers:
             df = self._fetch_via_scraper(ticker, as_of_date)
-        elif ticker in UCITS_TICKERS:
-            # TODO: Vanguard UCITS holdings download.
-            # The Vanguard UK/IE sites have aggressive anti-scraping
-            # protections (Akamai bot manager, dynamic JS-rendered pages).
-            # Potential future approaches:
-            #   - fund-docs.vanguard.com CSV if a stable URL is found
-            #   - justETF or another aggregator as fallback
-            #   - Selenium/Playwright for JS-rendered pages
-            raise NotImplementedError(
-                f"UCITS Vanguard ETF {ticker!r} is not yet supported. "
-                "Only US-listed Vanguard ETFs work via etf-scraper."
-            )
         else:
             raise ValueError(f"Cannot handle identifier: {identifier!r}")
 

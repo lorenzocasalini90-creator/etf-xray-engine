@@ -52,6 +52,22 @@ UCITS_TICKERS: frozenset[str] = frozenset({
 
 ALL_TICKERS: frozenset[str] = US_TICKERS | UCITS_TICKERS
 
+# UCITS ISIN → US-equivalent ticker for proxy fetching via etf-scraper
+UCITS_TO_US: dict[str, str] = {
+    "IE00B6YX5D40": "SPY",    # SPDR S&P 500 UCITS → SPY
+    "IE00BF2B0P08": "SDY",    # SPDR S&P US Dividend Aristocrats UCITS → SDY
+    "IE00BFY0GT14": "SPDW",   # SPDR MSCI World UCITS → SPDW
+    "IE00BFMXXD54": "SPDW",   # SPDR MSCI ACWI UCITS → SPDW proxy
+}
+
+# Reverse: UCITS ticker → US ticker
+_UCITS_TICKER_TO_US: dict[str, str] = {
+    "SPY5": "SPY",
+    "SPYD": "SDY",
+    "SPPW": "SPDW",
+    "SPYV": "SPDW",
+}
+
 # Asset classes to exclude
 _NON_EQUITY_CLASSES = frozenset({
     "Cash", "Money Market", "Cash Collateral and Margins",
@@ -106,6 +122,8 @@ class SPDRFetcher(BaseFetcher):
             return 0.0
         if clean in self._scraper_tickers or clean in ALL_TICKERS:
             return 0.9
+        if clean in UCITS_TO_US:
+            return 0.9
         # IE-domiciled ISINs — shared with many issuers
         if len(clean) == 12 and clean.startswith("IE") and clean.isalnum():
             return 0.3
@@ -129,15 +147,17 @@ class SPDRFetcher(BaseFetcher):
         """
         ticker = identifier.upper().strip()
 
-        if ticker in self._scraper_tickers:
+        # Check UCITS→US proxy mapping (ISIN or ticker)
+        us_proxy = UCITS_TO_US.get(ticker) or _UCITS_TICKER_TO_US.get(ticker)
+
+        if us_proxy and self._scraper:
+            logger.info("Proxying UCITS %s via US ticker %s", ticker, us_proxy)
+            df = self._fetch_via_scraper(us_proxy, as_of_date)
+            df["etf_ticker"] = ticker  # Label with original UCITS identifier
+        elif ticker in self._scraper_tickers:
             df = self._fetch_via_scraper(ticker, as_of_date)
-        elif ticker in UCITS_TICKERS:
-            raise NotImplementedError(
-                f"UCITS SPDR ETF {ticker!r} is not yet supported. "
-                "etf-scraper only covers US-listed tickers. "
-                "TODO: find a data source for SPDR UCITS holdings (ssga.com)."
-            )
         else:
+            # Try etf-scraper anyway — it may know tickers we don't
             df = self._fetch_via_scraper(ticker, as_of_date)
 
         df = self._filter_non_equity(df)

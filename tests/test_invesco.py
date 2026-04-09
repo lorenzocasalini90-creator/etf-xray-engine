@@ -105,9 +105,11 @@ class TestFetchHoldings:
 
         assert (df["etf_ticker"] == "QQQ").all()
 
-    def test_ucits_raises_not_implemented(self, fetcher: InvescoFetcher) -> None:
-        with pytest.raises(NotImplementedError, match="UCITS"):
-            fetcher.fetch_holdings("EQQQ")
+    def test_ucits_proxied_via_us_ticker(self, fetcher: InvescoFetcher) -> None:
+        fetcher._scraper.query_holdings.return_value = MOCK_SCRAPER_DF.copy()
+        df = fetcher.fetch_holdings("EQQQ")
+        # Should proxy via QQQ but label as EQQQ
+        assert (df["etf_ticker"] == "EQQQ").all()
 
 
 # ---------------------------------------------------------------------------
@@ -125,12 +127,11 @@ class TestTryFetch:
         assert result.holdings is not None
         assert result.source == "InvescoFetcher"
 
-    def test_try_fetch_ucits_fails_gracefully(self, fetcher: InvescoFetcher) -> None:
+    def test_try_fetch_ucits_proxied(self, fetcher: InvescoFetcher) -> None:
+        fetcher._scraper.query_holdings.return_value = MOCK_SCRAPER_DF.copy()
         result = fetcher.try_fetch("EQQQ")
-
-        assert result.status == "failed"
-        assert result.holdings is None
-        assert "UCITS" in result.message
+        assert result.status == "success"
+        assert result.holdings is not None
 
     def test_try_fetch_network_error(self, fetcher: InvescoFetcher) -> None:
         fetcher._scraper.query_holdings.side_effect = ConnectionError("timeout")

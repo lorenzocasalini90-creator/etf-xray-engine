@@ -105,9 +105,10 @@ class TestFetchHoldings:
 
         assert (df["etf_ticker"] == "SPY").all()
 
-    def test_ucits_raises_not_implemented(self, fetcher: SPDRFetcher) -> None:
-        with pytest.raises(NotImplementedError, match="UCITS"):
-            fetcher.fetch_holdings("SPY5")
+    def test_ucits_proxied_via_us_ticker(self, fetcher: SPDRFetcher) -> None:
+        fetcher._scraper.query_holdings.return_value = MOCK_SCRAPER_DF.copy()
+        df = fetcher.fetch_holdings("SPY5")
+        assert (df["etf_ticker"] == "SPY5").all()
 
 
 # ---------------------------------------------------------------------------
@@ -125,12 +126,11 @@ class TestTryFetch:
         assert result.holdings is not None
         assert result.source == "SPDRFetcher"
 
-    def test_try_fetch_ucits_fails_gracefully(self, fetcher: SPDRFetcher) -> None:
+    def test_try_fetch_ucits_proxied(self, fetcher: SPDRFetcher) -> None:
+        fetcher._scraper.query_holdings.return_value = MOCK_SCRAPER_DF.copy()
         result = fetcher.try_fetch("SPY5")
-
-        assert result.status == "failed"
-        assert result.holdings is None
-        assert "UCITS" in result.message
+        assert result.status == "success"
+        assert result.holdings is not None
 
     def test_try_fetch_network_error(self, fetcher: SPDRFetcher) -> None:
         fetcher._scraper.query_holdings.side_effect = ConnectionError("timeout")

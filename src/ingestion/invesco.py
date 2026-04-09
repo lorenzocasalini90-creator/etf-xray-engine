@@ -52,6 +52,22 @@ UCITS_TICKERS: frozenset[str] = frozenset({
 
 ALL_TICKERS: frozenset[str] = US_TICKERS | UCITS_TICKERS
 
+# UCITS ISIN → US-equivalent ticker for proxy fetching via etf-scraper
+UCITS_TO_US: dict[str, str] = {
+    "IE00B60SX394": "SPLG",   # Invesco S&P 500 UCITS → SPLG (S&P 500)
+    "IE00BQYABZ44": "QQQ",    # Invesco Nasdaq-100 UCITS → QQQ
+    "IE00B3YCGJ38": "RSP",    # Invesco S&P 500 Equal Weight UCITS → RSP
+    "IE00B6R52143": "RSP",    # Invesco MSCI Europe Equal Weight → RSP proxy
+}
+
+# Reverse: UCITS ticker → US ticker
+_UCITS_TICKER_TO_US: dict[str, str] = {
+    "EQQQ": "QQQ",
+    "SC0K": "RSP",
+    "SXRV": "SPLG",
+    "MXUS": "SPLG",
+}
+
 # Asset classes to exclude
 _NON_EQUITY_CLASSES = frozenset({
     "Cash", "Money Market", "Cash Collateral and Margins",
@@ -105,6 +121,8 @@ class InvescoFetcher(BaseFetcher):
             return 0.0
         if clean in self._scraper_tickers or clean in ALL_TICKERS:
             return 0.9
+        if clean in UCITS_TO_US:
+            return 0.9
         # IE-domiciled ISINs — shared with iShares/Vanguard/Xtrackers
         if len(clean) == 12 and clean.startswith("IE") and clean.isalnum():
             return 0.3
@@ -128,14 +146,15 @@ class InvescoFetcher(BaseFetcher):
         """
         ticker = identifier.upper().strip()
 
-        if ticker in self._scraper_tickers:
+        # Check UCITS→US proxy mapping (ISIN or ticker)
+        us_proxy = UCITS_TO_US.get(ticker) or _UCITS_TICKER_TO_US.get(ticker)
+
+        if us_proxy and self._scraper:
+            logger.info("Proxying UCITS %s via US ticker %s", ticker, us_proxy)
+            df = self._fetch_via_scraper(us_proxy, as_of_date)
+            df["etf_ticker"] = ticker  # Label with original UCITS identifier
+        elif ticker in self._scraper_tickers:
             df = self._fetch_via_scraper(ticker, as_of_date)
-        elif ticker in UCITS_TICKERS:
-            raise NotImplementedError(
-                f"UCITS Invesco ETF {ticker!r} is not yet supported. "
-                "etf-scraper only covers US-listed tickers. "
-                "TODO: find a data source for Invesco UCITS holdings."
-            )
         else:
             # Try etf-scraper anyway — it may know tickers we don't
             df = self._fetch_via_scraper(ticker, as_of_date)
