@@ -135,39 +135,41 @@ def parse_portfolio_file(
     return positions, errors
 
 
-def _parse_amount(raw: str) -> float | None:
-    """Parse amount string handling euro sign, locale separators.
+def _parse_amount(raw) -> float | None:
+    """Parse amount string handling euro/dollar signs, locale separators.
 
     Handles:
     - European format: 30.000 or 30.000,50 (dot=thousands, comma=decimal)
     - US format: 30,000 or 30,000.50 (comma=thousands, dot=decimal)
-    - Euro sign prefix, spaces
+    - Euro/dollar sign prefix, spaces
+    - Direct numeric values (int/float passthrough)
     """
-    s = raw.replace("€", "").replace(" ", "").strip()
+    if isinstance(raw, (int, float)):
+        return float(raw)
+
+    s = str(raw).strip().replace("€", "").replace("$", "").replace(" ", "")
     if not s:
         return None
 
     if "," in s and "." in s:
-        last_comma = s.rfind(",")
-        last_dot = s.rfind(".")
-        if last_comma > last_dot:
+        # Both present: last one is decimal separator
+        if s.rfind(",") > s.rfind("."):
             # European: 30.000,50 → 30000.50
             s = s.replace(".", "").replace(",", ".")
         else:
             # US: 30,000.50 → 30000.50
             s = s.replace(",", "")
     elif "," in s:
+        # Only comma: if exactly 3 digits after, it's thousands
         parts = s.split(",")
-        if len(parts) == 2 and len(parts[1]) <= 2:
-            # Decimal comma: 30000,50 → 30000.50
-            s = s.replace(",", ".")
-        else:
-            # Thousands comma: 30,000 → 30000
+        if len(parts) == 2 and len(parts[1]) == 3:
             s = s.replace(",", "")
+        else:
+            s = s.replace(",", ".")
     elif "." in s:
+        # Only dot: if exactly 3 digits after, it's thousands
         parts = s.split(".")
         if len(parts) == 2 and len(parts[1]) == 3:
-            # European thousands dot: 30.000 → 30000
             s = s.replace(".", "")
         # else: regular decimal dot, leave as-is
 

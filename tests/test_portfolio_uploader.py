@@ -39,6 +39,34 @@ class TestParseAmount:
     def test_invalid_returns_none(self):
         assert _parse_amount("abc") is None
 
+    def test_european_full_format(self):
+        """13.313,125 → 13313.125 (European: dot=thousands, comma=decimal)"""
+        assert _parse_amount("13.313,125") == 13313.125
+
+    def test_comma_thousands_three_digits(self):
+        """13313,125 — only comma, exactly 3 digits after → thousands."""
+        assert _parse_amount("13313,125") == 13313125.0
+
+    def test_dollar_sign(self):
+        assert _parse_amount("$30000") == 30000.0
+
+    def test_dollar_with_comma(self):
+        assert _parse_amount("$30,000.50") == 30000.50
+
+    def test_numeric_int_passthrough(self):
+        assert _parse_amount(30000) == 30000.0
+
+    def test_numeric_float_passthrough(self):
+        assert _parse_amount(13313.125) == 13313.125
+
+    def test_comma_decimal_two_digits(self):
+        """13313,12 → 13313.12 (decimal comma, 2 digits)"""
+        assert _parse_amount("13313,12") == 13313.12
+
+    def test_dot_decimal_two_digits(self):
+        """13313.12 → 13313.12 (decimal dot, 2 digits)"""
+        assert _parse_amount("13313.12") == 13313.12
+
 
 class TestGenerateTemplate:
     def test_generates_bytes(self):

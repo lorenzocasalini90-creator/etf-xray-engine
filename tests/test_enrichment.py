@@ -345,3 +345,32 @@ class TestExchangeCountryMap:
         assert EXCHANGE_COUNTRY_MAP["IM"] == "Italy"
         assert EXCHANGE_COUNTRY_MAP["SS"] == "Sweden"
         assert EXCHANGE_COUNTRY_MAP["DC"] == "Denmark"
+
+
+class TestExpandedStaticMapping:
+    """Test that defense/banking/energy entries exist in static mapping."""
+
+    @pytest.mark.parametrize("name,expected_sector,expected_country", [
+        ("BOEING", "Industrials", "United States"),
+        ("AIRBUS", "Industrials", "France"),
+        ("DEUTSCHE BANK", "Financials", "Germany"),
+        ("HSBC", "Financials", "United Kingdom"),
+        ("SOCIETE GENERALE", "Financials", "France"),
+        ("CREDIT AGRICOLE", "Financials", "France"),
+        ("BARCLAYS", "Financials", "United Kingdom"),
+        ("STANDARD CHARTERED", "Financials", "United Kingdom"),
+        ("NORDEA", "Financials", "Finland"),
+        ("DANSKE BANK", "Financials", "Denmark"),
+        ("KBC GROUP", "Financials", "Belgium"),
+        ("ERSTE GROUP", "Financials", "Austria"),
+        ("RAIFFEISEN", "Financials", "Austria"),
+        ("COMMERZBANK", "Financials", "Germany"),
+        ("REPSOL", "Energy", "Spain"),
+        ("GALP", "Energy", "Portugal"),
+        ("OMV", "Energy", "Austria"),
+    ])
+    def test_entry_exists(self, name, expected_sector, expected_country):
+        assert name in STATIC_SECTOR_COUNTRY
+        sector, country = STATIC_SECTOR_COUNTRY[name]
+        assert sector == expected_sector
+        assert country == expected_country

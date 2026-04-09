@@ -157,6 +157,26 @@ STATIC_SECTOR_COUNTRY: dict[str, tuple[str, str]] = {
     "INFINEON": ("Information Technology", "Germany"),
     "INFINEON TECHNOLOGIES": ("Information Technology", "Germany"),
     "COGNEX": ("Information Technology", "United States"),
+    # Defense / Aerospace — additional
+    "BOEING": ("Industrials", "United States"),
+    "AIRBUS": ("Industrials", "France"),
+    # European banks
+    "DEUTSCHE BANK": ("Financials", "Germany"),
+    "SOCIETE GENERALE": ("Financials", "France"),
+    "CREDIT AGRICOLE": ("Financials", "France"),
+    "BARCLAYS": ("Financials", "United Kingdom"),
+    "HSBC": ("Financials", "United Kingdom"),
+    "STANDARD CHARTERED": ("Financials", "United Kingdom"),
+    "NORDEA": ("Financials", "Finland"),
+    "DANSKE BANK": ("Financials", "Denmark"),
+    "KBC GROUP": ("Financials", "Belgium"),
+    "ERSTE GROUP": ("Financials", "Austria"),
+    "RAIFFEISEN": ("Financials", "Austria"),
+    "COMMERZBANK": ("Financials", "Germany"),
+    # Energy — additional
+    "REPSOL": ("Energy", "Spain"),
+    "GALP": ("Energy", "Portugal"),
+    "OMV": ("Energy", "Austria"),
 }
 
 # Hardcoded exchange code → country mapping for major markets
