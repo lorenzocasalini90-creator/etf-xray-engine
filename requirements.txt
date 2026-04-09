@@ -8,3 +8,4 @@ streamlit>=1.30
 plotly>=5.18
 reportlab>=4.0
 justetf-scraping @ git+https://github.com/druzsan/justetf-scraping.git
+etf-scraper>=0.1
