@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter
 
-from src.storage.db import get_session_factory
+from api.dependencies import get_session_factory_cached
 from src.storage.models import HoldingsCache
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ async def health_check():
     }
 
     try:
-        Session = get_session_factory()
+        Session = get_session_factory_cached()
         with Session() as session:
             session.execute(__import__("sqlalchemy").text("SELECT 1"))
             cache_count = session.query(HoldingsCache).count()
