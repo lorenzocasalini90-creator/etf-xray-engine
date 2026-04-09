@@ -104,8 +104,8 @@ class SPDRFetcher(BaseFetcher):
                 "etf-scraper loaded: %d SPDR tickers",
                 len(self._scraper_tickers),
             )
-        except Exception:
-            logger.warning("etf-scraper unavailable — no SPDR support")
+        except Exception as exc:
+            logger.warning("etf-scraper unavailable — no SPDR support: %s", exc)
 
     # ------------------------------------------------------------------
     # BaseFetcher interface

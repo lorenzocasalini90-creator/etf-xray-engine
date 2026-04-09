@@ -83,8 +83,8 @@ class VanguardFetcher(BaseFetcher):
                 "etf-scraper loaded: %d Vanguard tickers",
                 len(self._scraper_tickers),
             )
-        except Exception:
-            logger.warning("etf-scraper unavailable — no Vanguard support")
+        except Exception as exc:
+            logger.warning("etf-scraper unavailable — no Vanguard support: %s", exc)
 
     def can_handle(self, identifier: str) -> float:
         """Return confidence score (0.0–1.0) for handling *identifier*.

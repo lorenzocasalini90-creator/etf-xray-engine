@@ -103,8 +103,8 @@ class InvescoFetcher(BaseFetcher):
                 "etf-scraper loaded: %d Invesco tickers",
                 len(self._scraper_tickers),
             )
-        except Exception:
-            logger.warning("etf-scraper unavailable — no Invesco support")
+        except Exception as exc:
+            logger.warning("etf-scraper unavailable — no Invesco support: %s", exc)
 
     # ------------------------------------------------------------------
     # BaseFetcher interface

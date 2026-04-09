@@ -141,8 +141,8 @@ class ISharesFetcher(BaseFetcher):
             logger.info(
                 "etf-scraper loaded: %d iShares tickers", len(self._scraper_tickers)
             )
-        except Exception:
-            logger.warning("etf-scraper unavailable — UCITS-only mode")
+        except Exception as exc:
+            logger.warning("etf-scraper unavailable — UCITS-only mode: %s", exc)
 
     # ------------------------------------------------------------------
     # BaseFetcher interface

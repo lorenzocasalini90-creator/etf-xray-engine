@@ -1,5 +1,13 @@
 """ETF X-Ray Engine — Streamlit Dashboard entry point."""
 
+import os
+import sys
+
+# Ensure project root is on sys.path for absolute imports (from src.*)
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
 import streamlit as st
 
 st.set_page_config(
@@ -9,7 +17,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-import os
 from src.dashboard.components.ga4 import inject_ga4
 
 inject_ga4()
