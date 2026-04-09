@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-import signal
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from datetime import date
 
@@ -37,10 +37,6 @@ class _MetadataTimeout(Exception):
     """Raised when metadata resolution exceeds the allowed time."""
 
 
-def _timeout_handler(signum, frame):
-    raise _MetadataTimeout("Metadata resolution timed out")
-
-
 def resolve_metadata(identifier: str) -> ETFMetadata | None:
     """Resolve ETF metadata via JustETFFetcher (if justetf-scraping installed).
 
@@ -61,14 +57,13 @@ def resolve_metadata(identifier: str) -> ETFMetadata | None:
         if not fetcher._available:
             return None
 
-        # Set alarm-based timeout to prevent hanging on network calls
-        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(METADATA_TIMEOUT)
-        try:
-            meta = fetcher.get_metadata(identifier)
-        finally:
-            signal.alarm(0)  # Cancel alarm
-            signal.signal(signal.SIGALRM, old_handler)
+        # Use ThreadPoolExecutor for timeout (signal.alarm doesn't work in threads)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(fetcher.get_metadata, identifier)
+            try:
+                meta = future.result(timeout=METADATA_TIMEOUT)
+            except FuturesTimeoutError:
+                raise _MetadataTimeout("Metadata resolution timed out")
 
         if meta is None:
             return None
