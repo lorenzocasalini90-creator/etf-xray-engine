@@ -4,9 +4,13 @@ Calculates real exposure per security across multiple ETFs,
 weighted by capital allocation.
 """
 
+import logging
+
 import pandas as pd
 
 from src.analytics._match_key import add_match_key, build_match_keys_from_holdings
+
+logger = logging.getLogger(__name__)
 
 
 def aggregate_portfolio(
@@ -49,35 +53,57 @@ def aggregate_portfolio(
 
         df = holdings_db.get(ticker)
         if df is None or df.empty:
+            logger.warning("No holdings for %s — skipping", ticker)
             continue
 
-        df = add_match_key(df)
-        if "weight_pct" in df.columns:
-            df["weight_pct"] = pd.to_numeric(df["weight_pct"], errors="coerce").fillna(0.0)
+        # Defensive: ensure required columns exist
+        for col in ("weight_pct", "holding_isin", "holding_name"):
+            if col not in df.columns:
+                df[col] = None
+
+        try:
+            df = add_match_key(df)
+        except Exception as exc:
+            logger.warning("Failed to build match keys for %s: %s — skipping", ticker, exc)
+            continue
+
+        df["weight_pct"] = pd.to_numeric(df["weight_pct"], errors="coerce").fillna(0.0)
+
+        # Warn if partial coverage (e.g. JustETF top-10)
+        total_weight = df["weight_pct"].sum()
+        if 0 < total_weight < 50:
+            logger.warning(
+                "%s has partial coverage (%.1f%% total weight) — including as-is",
+                ticker, total_weight,
+            )
 
         for _, row in df.iterrows():
-            key = row.get("_match_key")
-            if not key or (isinstance(key, float) and pd.isna(key)):
+            try:
+                key = row.get("_match_key")
+                if not key or (isinstance(key, float) and pd.isna(key)):
+                    continue
+
+                holding_weight = row.get("weight_pct", 0)
+                if pd.isna(holding_weight):
+                    holding_weight = 0
+                real_weight = etf_weight * (holding_weight / 100.0)
+
+                if key in records:
+                    records[key]["real_weight_pct"] += real_weight * 100
+                    records[key]["sources"].add(ticker)
+                else:
+                    records[key] = {
+                        "composite_figi": row.get("composite_figi") if "composite_figi" in row.index else None,
+                        "name": row.get("holding_name", "") or "",
+                        "ticker": row.get("holding_ticker", "") or "",
+                        "sector": row.get("sector", "") or "",
+                        "country": row.get("country", "") or "",
+                        "real_weight_pct": real_weight * 100,
+                        "sources": {ticker},
+                    }
+            except Exception as exc:
+                logger.warning("Failed to process holding in %s: %s", ticker, exc)
                 continue
-
-            holding_weight = row.get("weight_pct", 0)
-            if pd.isna(holding_weight):
-                holding_weight = 0
-            real_weight = etf_weight * (holding_weight / 100.0)
-
-            if key in records:
-                records[key]["real_weight_pct"] += real_weight * 100
-                records[key]["sources"].add(ticker)
-            else:
-                records[key] = {
-                    "composite_figi": row.get("composite_figi") if "composite_figi" in row.index else None,
-                    "name": row.get("holding_name", ""),
-                    "ticker": row.get("holding_ticker", ""),
-                    "sector": row.get("sector", ""),
-                    "country": row.get("country", ""),
-                    "real_weight_pct": real_weight * 100,
-                    "sources": {ticker},
-                }
 
     if not records:
         return empty

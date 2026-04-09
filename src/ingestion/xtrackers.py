@@ -120,8 +120,9 @@ def _retry_request(
             resp.raise_for_status()
             return resp
         except requests.HTTPError as exc:
-            if exc.response is not None and exc.response.status_code == 404:
-                raise  # 404 = wrong ETF, no retry
+            status = exc.response.status_code if exc.response is not None else 0
+            if status in (404, 500):
+                raise  # 404/500 from DWS = not available, no retry
             last_exc = exc
             wait = BACKOFF_BASE ** attempt
             logger.warning(
