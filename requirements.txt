@@ -9,3 +9,7 @@ plotly>=5.18
 reportlab>=4.0
 justetf-scraping @ git+https://github.com/druzsan/justetf-scraping.git
 etf-scraper>=0.1
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+pydantic>=2.0
