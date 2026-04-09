@@ -5,11 +5,14 @@ Sources (in priority order):
 2. Exchange code → country mapping (from figi_mapping table)
 3. Static mapping for well-known securities (defense, energy, tech)
 4. yfinance (top 50 holdings by weight only, to avoid rate limits)
+5. API Ninjas (for remaining unknowns, if API_NINJAS_KEY is set)
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import time
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -277,6 +280,9 @@ def enrich_missing_data(
 
     # Step 3: yfinance for top holdings still missing data
     _enrich_from_yfinance(result, top_n=yfinance_top_n, db_session=db_session)
+
+    # Step 4: API Ninjas for remaining unknowns
+    _enrich_from_api_ninjas(result, top_n=yfinance_top_n, db_session=db_session)
 
     # Normalize empty strings back to "Unknown" for display
     for col in ("sector", "country"):
@@ -583,5 +589,122 @@ def _enrich_from_yfinance(
     if filled_sector or filled_country:
         logger.info(
             "yfinance enrichment: filled %d sectors, %d countries",
+            filled_sector, filled_country,
+        )
+
+
+def _enrich_from_api_ninjas(
+    df: pd.DataFrame, top_n: int = 50, db_session: Session | None = None,
+) -> None:
+    """Fill missing sector/country via API Ninjas for top holdings still unknown.
+
+    Skips silently if API_NINJAS_KEY env var is not set.
+    Results are cached in the yfinance_cache DB table (same mechanism).
+    Rate limited to 1 request/second.
+    """
+    api_key = os.environ.get("API_NINJAS_KEY")
+    if not api_key:
+        return
+
+    missing = df[
+        ((df["sector"] == "") | (df["sector"] == "Unknown"))
+        | ((df["country"] == "") | (df["country"] == "Unknown"))
+    ]
+    if missing.empty:
+        return
+
+    if "real_weight_pct" in missing.columns:
+        missing = missing.nlargest(top_n, "real_weight_pct")
+
+    import requests
+
+    yf_cache = _load_yfinance_cache(db_session)
+    filled_sector = 0
+    filled_country = 0
+    cache_dirty = False
+
+    # Build lookups — only tickers (API Ninjas needs a ticker symbol)
+    lookups: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    for idx, row in missing.iterrows():
+        ticker = str(row.get("ticker", "")).strip()
+        if ticker and len(ticker) <= 10:
+            upper = ticker.upper()
+            if upper not in seen:
+                seen.add(upper)
+            lookups.append((idx, ticker))
+
+    if not lookups:
+        return
+
+    fetched: dict[str, dict[str, str]] = {}
+
+    for _, key in lookups:
+        upper_key = key.upper()
+        if upper_key in fetched:
+            continue
+
+        # Check cache first (shared with yfinance cache)
+        if upper_key in yf_cache:
+            cached = yf_cache[upper_key]
+            if cached.get("sector") or cached.get("country"):
+                fetched[upper_key] = cached
+                continue
+
+        # Fetch from API Ninjas
+        try:
+            time.sleep(1)  # Rate limit: 1 req/sec
+            resp = requests.get(
+                f"https://api.api-ninjas.com/v1/stockprice?ticker={key}",
+                headers={"X-Api-Key": api_key},
+                timeout=5,
+            )
+            if resp.status_code == 404 or not resp.text.strip():
+                yf_cache[upper_key] = {"sector": "", "country": ""}
+                cache_dirty = True
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+
+            # API Ninjas stockprice returns a dict or list
+            if isinstance(data, list):
+                data = data[0] if data else {}
+
+            sector = data.get("sector", "") or ""
+            country = data.get("country", "") or ""
+
+            result = {"sector": sector, "country": country}
+            fetched[upper_key] = result
+            yf_cache[upper_key] = result
+            cache_dirty = True
+        except Exception as exc:
+            logger.debug("API Ninjas lookup failed for %s: %s", key, exc)
+            yf_cache[upper_key] = {"sector": "", "country": ""}
+            cache_dirty = True
+            continue
+
+    # Apply fetched data
+    for idx, key in lookups:
+        data = fetched.get(key.upper())
+        if not data:
+            continue
+
+        cur_sector = str(df.at[idx, "sector"]).strip()
+        cur_country = str(df.at[idx, "country"]).strip()
+        needs_sector = not cur_sector or cur_sector == "Unknown"
+
+        if needs_sector and data.get("sector"):
+            df.at[idx, "sector"] = data["sector"]
+            filled_sector += 1
+        if data.get("country") and (needs_sector or not cur_country or cur_country == "Unknown"):
+            df.at[idx, "country"] = data["country"]
+            filled_country += 1
+
+    if cache_dirty:
+        _save_yfinance_cache(yf_cache, db_session)
+
+    if filled_sector or filled_country:
+        logger.info(
+            "API Ninjas enrichment: filled %d sectors, %d countries",
             filled_sector, filled_country,
         )

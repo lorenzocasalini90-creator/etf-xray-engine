@@ -100,6 +100,10 @@ _ISSUER_FETCHER_MAP: dict[str, str] = {
     "vaneck": "VanEckFetcher",
     "van eck": "VanEckFetcher",
     "ubs": "UBSFetcher",
+    "l&g": "LGIMFetcher",
+    "lgim": "LGIMFetcher",
+    "legal & general": "LGIMFetcher",
+    "legal and general": "LGIMFetcher",
 }
 
 
