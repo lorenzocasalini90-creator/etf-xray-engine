@@ -385,6 +385,7 @@ input, select { font-family: inherit; }
   align-items: center;
   justify-content: center;
 }
+#loading-overlay[hidden] { display: none; }
 .loading-content {
   text-align: center;
 }
