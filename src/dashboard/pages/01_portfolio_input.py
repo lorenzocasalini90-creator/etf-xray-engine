@@ -6,6 +6,7 @@ import hashlib
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import streamlit as st
 
@@ -376,32 +377,49 @@ if run_analysis:
     n = len(positions)
     status_container = st.status(f"Analisi di {n} ETF…", expanded=True)
 
-    for i, pos in enumerate(positions):
+    # Split cached vs to-fetch
+    to_fetch: list[str] = []
+    for pos in positions:
         ticker = pos["ticker"]
-        step = f"({i + 1}/{n})"
         if ticker in holdings_db and not force_refresh:
-            status_container.write(f"⚡ {ticker} {step} — già in memoria")
-            continue
-        try:
-            status_container.update(label=f"Scaricamento {ticker}… {step}")
-            result = orchestrator.fetch(ticker, force_refresh=force_refresh)
+            status_container.write(f"⚡ {ticker} — già in memoria")
+        else:
+            to_fetch.append(ticker)
 
-            if result.status == "cached":
-                n_h = len(result.holdings) if result.holdings is not None else 0
-                status_container.write(f"⚡ {ticker} {step} — {n_h} holdings dalla cache")
-            elif result.status == "success":
-                n_h = len(result.holdings) if result.holdings is not None else 0
-                status_container.write(f"✅ {ticker} {step} — {n_h} holdings da {result.source}")
-            elif result.status == "partial":
-                status_container.write(f"⚠️ {ticker} {step} — {result.message}")
-            elif result.status == "failed":
-                st.error(f"❌ {ticker}: {result.message}")
-                continue
+    if to_fetch:
+        # Worker: each thread gets its own FetchOrchestrator (own requests sessions)
+        # cache_manager is shared — thread-safe (session-per-operation)
+        def _fetch_one(tkr: str) -> tuple[str, FetchResult]:
+            orch = FetchOrchestrator(cache=cache_manager)
+            return tkr, orch.fetch(tkr, force_refresh=force_refresh)
 
-            if result.holdings is not None:
-                holdings_db[ticker] = result.holdings
-        except Exception as exc:
-            st.error(f"Errore per {ticker}: {exc}")
+        status_container.update(label=f"Scaricamento parallelo di {len(to_fetch)} ETF…")
+        done = 0
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futures = {pool.submit(_fetch_one, tkr): tkr for tkr in to_fetch}
+            for future in as_completed(futures):
+                ticker = futures[future]
+                done += 1
+                step = f"({done}/{len(to_fetch)})"
+                try:
+                    _, result = future.result()
+
+                    if result.status == "cached":
+                        n_h = len(result.holdings) if result.holdings is not None else 0
+                        status_container.write(f"⚡ {ticker} {step} — {n_h} holdings dalla cache")
+                    elif result.status == "success":
+                        n_h = len(result.holdings) if result.holdings is not None else 0
+                        status_container.write(f"✅ {ticker} {step} — {n_h} holdings da {result.source}")
+                    elif result.status == "partial":
+                        status_container.write(f"⚠️ {ticker} {step} — {result.message}")
+                    elif result.status == "failed":
+                        st.error(f"❌ {ticker}: {result.message}")
+                        continue
+
+                    if result.holdings is not None:
+                        holdings_db[ticker] = result.holdings
+                except Exception as exc:
+                    st.error(f"Errore per {ticker}: {exc}")
 
     status_container.update(label=f"Aggregazione…")
     st.session_state.holdings_db = holdings_db
