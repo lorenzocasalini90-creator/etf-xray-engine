@@ -18,8 +18,11 @@ class TestParseAmount:
     def test_with_euro_sign(self):
         assert _parse_amount("€30000") == 30000.0
 
-    def test_european_thousands(self):
-        assert _parse_amount("30.000") == 30000.0
+    def test_single_dot_ambiguous_treated_as_decimal(self):
+        """Single dot with 3 digits after: ambiguous — treat as decimal for safety."""
+        assert _parse_amount("30.000") == 30.0
+        assert _parse_amount("13.313") == 13.313
+        assert _parse_amount("9.268") == 9.268
 
     def test_european_decimal(self):
         assert _parse_amount("30.000,50") == 30000.50
@@ -67,6 +70,14 @@ class TestParseAmount:
         """13313.12 → 13313.12 (decimal dot, 2 digits)"""
         assert _parse_amount("13313.12") == 13313.12
 
+    def test_string_float_decimal_not_thousands(self):
+        """'13313.125' as string — decimal, NOT thousands × 1000."""
+        assert _parse_amount("13313.125") == 13313.125
+
+    def test_multi_dot_eu_thousands(self):
+        """'1.313.000' — multiple dot-groups of 3 → unambiguous EU thousands."""
+        assert _parse_amount("1.313.000") == 1313000.0
+
 
 class TestGenerateTemplate:
     def test_generates_bytes(self):
@@ -100,7 +111,7 @@ class TestParseCSV:
         assert len(positions) == 2
 
     def test_euro_amounts(self):
-        csv = self._make_csv("ticker,importo\nCSPX,€30.000\nSWDA,€40.000,50\n")
+        csv = self._make_csv("ticker;importo\nCSPX;€30.000,00\nSWDA;€40.000,50\n")
         positions, errors = parse_portfolio_file(csv, filename="test.csv")
         assert positions[0]["capital"] == 30000.0
 

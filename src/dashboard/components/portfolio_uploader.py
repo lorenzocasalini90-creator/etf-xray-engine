@@ -167,9 +167,12 @@ def _parse_amount(raw) -> float | None:
         else:
             s = s.replace(",", ".")
     elif "." in s:
-        # Only dot: if exactly 3 digits after, it's thousands
+        # Only dot: treat as thousands separator ONLY if multiple dot-groups of 3
+        # e.g. "1.313.000" → 1313000 (unambiguous EU thousands)
+        # e.g. "13.313"    → 13.313  (ambiguous — treat as decimal for safety)
+        # e.g. "13313.125" → 13313.125 (decimal — NEVER strip)
         parts = s.split(".")
-        if len(parts) == 2 and len(parts[1]) == 3:
+        if len(parts) > 2 and all(len(p) == 3 for p in parts[1:]):
             s = s.replace(".", "")
         # else: regular decimal dot, leave as-is
 
