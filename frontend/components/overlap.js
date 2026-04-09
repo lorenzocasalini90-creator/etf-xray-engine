@@ -12,6 +12,20 @@ export function renderOverlap(container, data) {
   const header = _makeHeader('2', 'Overlap & Ridondanza', 'Quanto si sovrappongono i tuoi ETF');
   container.appendChild(header);
 
+  // Edge case: 1 ETF — show empty state
+  if (!redundancy || redundancy.length < 2) {
+    const empty = document.createElement('div');
+    empty.className = 'card';
+    empty.style.textAlign = 'center';
+    empty.style.padding = '40px 20px';
+    const msg = document.createElement('p');
+    msg.style.cssText = 'color:var(--text-t);font-size:13px';
+    msg.textContent = 'Aggiungi almeno 2 ETF per vedere l\u2019analisi di overlap e ridondanza.';
+    empty.appendChild(msg);
+    container.appendChild(empty);
+    return;
+  }
+
   // Alert banner for TER waste
   const totalWaste = redundancy.reduce((s, r) => s + r.ter_waste_eur, 0);
   if (totalWaste > 0) {

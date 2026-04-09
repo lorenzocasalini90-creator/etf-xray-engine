@@ -136,20 +136,30 @@ def _build_redundancy(
     return items
 
 
+def _get_benchmark_df(benchmark_name: str | None) -> pd.DataFrame | None:
+    """Fetch benchmark holdings once (shared between active_share and factors)."""
+    if not benchmark_name:
+        return None
+    try:
+        from src.analytics.benchmark import BenchmarkManager
+        bmgr = BenchmarkManager()
+        return bmgr.get_benchmark_holdings(benchmark_name)
+    except Exception as exc:
+        logger.warning("Benchmark fetch failed: %s", exc)
+        return None
+
+
 def _build_active_bets(
     aggregated: pd.DataFrame,
-    benchmark_name: str | None,
+    bench_df: pd.DataFrame | None,
 ) -> tuple[ActiveBets, float | None]:
     """Compute active share and build ActiveBets response."""
-    if not benchmark_name:
+    if bench_df is None:
         return ActiveBets(overweight=[], underweight=[]), None
 
     try:
         from src.analytics.active_share import active_share
-        from src.analytics.benchmark import BenchmarkManager
 
-        bmgr = BenchmarkManager()
-        bench_df = bmgr.get_benchmark_holdings(benchmark_name)
         result = active_share(aggregated, bench_df)
 
         overweight = []
@@ -201,7 +211,7 @@ def _build_exposure(
 
 def _build_factors(
     aggregated: pd.DataFrame,
-    benchmark_name: str | None,
+    bench_df: pd.DataFrame | None,
 ) -> FactorResult:
     """Run factor engine and build FactorResult."""
     try:
@@ -210,16 +220,7 @@ def _build_factors(
         factory = get_session_factory_cached()
         session = factory()
         try:
-            engine = FactorEngine(session, top_n_yfinance=30)
-
-            bench_df = None
-            if benchmark_name:
-                try:
-                    from src.analytics.benchmark import BenchmarkManager
-                    bmgr = BenchmarkManager()
-                    bench_df = bmgr.get_benchmark_holdings(benchmark_name)
-                except Exception:
-                    pass
+            engine = FactorEngine(session, top_n_yfinance=5)
 
             result = engine.analyze(aggregated, benchmark_df=bench_df)
             scores = result["factor_scores"]
@@ -382,7 +383,7 @@ def _build_insights(
 
 
 @router.post("/analyze", response_model=AnalysisResult)
-async def analyze_portfolio(request: PortfolioRequest):
+def analyze_portfolio(request: PortfolioRequest):
     """Run full portfolio X-Ray analysis."""
     portfolio_id = str(uuid.uuid4())
     orchestrator = get_orchestrator()
@@ -436,15 +437,18 @@ async def analyze_portfolio(request: PortfolioRequest):
         logger.warning("Redundancy failed: %s", exc)
         redundancy_items = []
 
-    # 7. Active bets
-    active_bets, active_share_pct = _build_active_bets(aggregated, request.benchmark)
+    # 7. Fetch benchmark once (shared between active_bets and factors)
+    bench_df = _get_benchmark_df(request.benchmark)
 
-    # 8. Sector/Country exposure
+    # 8. Active bets
+    active_bets, active_share_pct = _build_active_bets(aggregated, bench_df)
+
+    # 9. Sector/Country exposure
     sector_items = _build_exposure(aggregated, sector_exposure, "sector")
     country_items = _build_exposure(aggregated, country_exposure, "country")
 
-    # 9. Factors
-    factor_result = _build_factors(aggregated, request.benchmark)
+    # 10. Factors (skip benchmark comparison — active_share already covers it)
+    factor_result = _build_factors(aggregated, None)
 
     # 10. Insights
     insights = _build_insights(

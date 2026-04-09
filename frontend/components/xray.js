@@ -30,9 +30,12 @@ export function renderXRay(container, data) {
     ? data.redundancy.reduce((s, r) => s + r.ter_waste_eur, 0)
     : 0;
   const asClass = kpis.active_share > 40 ? 'kpi-green' : kpis.active_share > 20 ? 'kpi-amber' : 'kpi-coral';
+  const asValue = kpis.active_share < 1
+    ? 'Identico al benchmark'
+    : fmtPct(kpis.active_share);
   const kpiData = [
     { label: 'Titoli unici', value: fmtNum(kpis.unique_securities), cls: '' },
-    { label: 'Active Share', value: fmtPct(kpis.active_share), cls: asClass },
+    { label: 'Active Share', value: asValue, cls: asClass },
     { label: 'HHI (concentrazione)', value: (kpis.hhi * 10000).toFixed(0), cls: '' },
     { label: 'TER inefficienza', value: fmtEur(terWaste) + '/anno', cls: 'kpi-coral' },
   ];
