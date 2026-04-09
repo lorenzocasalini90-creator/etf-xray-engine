@@ -9,9 +9,7 @@ Sources (in priority order):
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -21,31 +19,46 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# File-based cache for yfinance lookups (persists across sessions)
-_YFINANCE_CACHE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "src", "data", "yfinance_cache.json",
-)
-
-
-def _load_yfinance_cache() -> dict[str, dict]:
-    """Load cached yfinance sector/country data from disk."""
-    if os.path.exists(_YFINANCE_CACHE_PATH):
-        try:
-            with open(_YFINANCE_CACHE_PATH) as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {}
-
-
-def _save_yfinance_cache(cache: dict[str, dict]) -> None:
-    """Persist yfinance cache to disk."""
+def _load_yfinance_cache(db_session: Session | None) -> dict[str, dict]:
+    """Load cached yfinance sector/country data from the database."""
+    if db_session is None:
+        return {}
     try:
-        with open(_YFINANCE_CACHE_PATH, "w") as f:
-            json.dump(cache, f, indent=2)
-    except OSError as exc:
-        logger.warning("Failed to save yfinance cache: %s", exc)
+        from src.storage.models import YfinanceCache
+        rows = db_session.query(YfinanceCache).all()
+        return {
+            row.ticker: {"sector": row.sector or "", "country": row.country or ""}
+            for row in rows
+        }
+    except Exception as exc:
+        logger.warning("Failed to load yfinance cache from DB: %s", exc)
+        return {}
+
+
+def _save_yfinance_cache(cache: dict[str, dict], db_session: Session | None) -> None:
+    """Persist yfinance cache to the database."""
+    if db_session is None:
+        return
+    try:
+        from src.storage.models import YfinanceCache
+        for ticker, data in cache.items():
+            existing = db_session.get(YfinanceCache, ticker)
+            if existing:
+                existing.sector = data.get("sector", "")
+                existing.country = data.get("country", "")
+            else:
+                db_session.add(YfinanceCache(
+                    ticker=ticker,
+                    sector=data.get("sector", ""),
+                    country=data.get("country", ""),
+                ))
+        db_session.commit()
+    except Exception as exc:
+        logger.warning("Failed to save yfinance cache to DB: %s", exc)
+        try:
+            db_session.rollback()
+        except Exception:
+            pass
 
 
 # Common suffixes to strip when normalizing holding names for matching
@@ -263,7 +276,7 @@ def enrich_missing_data(
     _enrich_from_static_mapping(result)
 
     # Step 3: yfinance for top holdings still missing data
-    _enrich_from_yfinance(result, top_n=yfinance_top_n)
+    _enrich_from_yfinance(result, top_n=yfinance_top_n, db_session=db_session)
 
     # Normalize empty strings back to "Unknown" for display
     for col in ("sector", "country"):
@@ -453,11 +466,13 @@ def _normalize_name_for_yfinance(name: str) -> str | None:
     return clean if clean else None
 
 
-def _enrich_from_yfinance(df: pd.DataFrame, top_n: int = 50) -> None:
+def _enrich_from_yfinance(
+    df: pd.DataFrame, top_n: int = 50, db_session: Session | None = None,
+) -> None:
     """Fill missing sector/country from yfinance for top holdings by weight.
 
     Handles holdings without tickers by attempting name-based lookups.
-    Results are cached to disk to avoid repeated API calls.
+    Results are cached in the database to persist across deploys.
     """
     missing = df[
         ((df["sector"] == "") | (df["sector"] == "Unknown"))
@@ -477,8 +492,8 @@ def _enrich_from_yfinance(df: pd.DataFrame, top_n: int = 50) -> None:
         logger.warning("yfinance not installed, skipping yfinance enrichment")
         return
 
-    # Load persistent cache
-    yf_cache = _load_yfinance_cache()
+    # Load persistent cache from DB
+    yf_cache = _load_yfinance_cache(db_session)
 
     filled_sector = 0
     filled_country = 0
@@ -563,7 +578,7 @@ def _enrich_from_yfinance(df: pd.DataFrame, top_n: int = 50) -> None:
 
     # Save cache if changed
     if cache_dirty:
-        _save_yfinance_cache(yf_cache)
+        _save_yfinance_cache(yf_cache, db_session)
 
     if filled_sector or filled_country:
         logger.info(

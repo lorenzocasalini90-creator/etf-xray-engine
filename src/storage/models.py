@@ -164,6 +164,17 @@ class HoldingsCache(Base):
     status: Mapped[str] = mapped_column(String(20), default="success")
 
 
+class YfinanceCache(Base):
+    """Cache per lookup yfinance settore/paese."""
+
+    __tablename__ = "yfinance_cache"
+
+    ticker: Mapped[str] = mapped_column(String(50), primary_key=True)
+    sector: Mapped[str | None] = mapped_column(String(100))
+    country: Mapped[str | None] = mapped_column(String(100))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class PortfolioPosition(Base):
     """Posizioni nei portafogli utente."""
 
