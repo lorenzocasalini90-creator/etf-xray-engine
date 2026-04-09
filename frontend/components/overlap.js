@@ -1,7 +1,7 @@
 /**
  * Overlap & Redundancy section — redundancy cards + heatmap.
- * Uses DOM API for safe rendering.
  */
+import { sanitize, fmtEur, fmtPct } from './sanitize.js';
 import { renderHeatmap } from '../charts/heatmap.js';
 
 export function renderOverlap(container, data) {
@@ -9,7 +9,6 @@ export function renderOverlap(container, data) {
   container.textContent = '';
   container.classList.add('fade-in');
 
-  // Header
   const header = _makeHeader('2', 'Overlap & Ridondanza', 'Quanto si sovrappongono i tuoi ETF');
   container.appendChild(header);
 
@@ -22,13 +21,13 @@ export function renderOverlap(container, data) {
     icon.className = 'alert-icon';
     icon.textContent = '\uD83D\uDCB8';
     const text = document.createElement('span');
-    text.textContent = 'Stai pagando circa \u20AC' + totalWaste.toFixed(0) +
+    text.textContent = 'Stai pagando circa ' + fmtEur(totalWaste) +
       '/anno in commissioni su holdings duplicate tra i tuoi ETF.';
     banner.append(icon, text);
     container.appendChild(banner);
   }
 
-  // Redundancy cards grid
+  // Redundancy cards
   if (redundancy.length > 0) {
     const cardTitle = document.createElement('div');
     cardTitle.className = 'card-title';
@@ -46,11 +45,11 @@ export function renderOverlap(container, data) {
 
       const ticker = document.createElement('div');
       ticker.className = 'red-ticker';
-      ticker.textContent = r.etf_ticker;
+      ticker.textContent = sanitize(r.etf_ticker);
 
       const pct = document.createElement('div');
       pct.className = 'red-pct ' + pctClass;
-      pct.textContent = r.redundancy_pct.toFixed(1) + '%';
+      pct.textContent = fmtPct(r.redundancy_pct);
 
       const progWrap = document.createElement('div');
       progWrap.className = 'progress';
@@ -61,13 +60,12 @@ export function renderOverlap(container, data) {
 
       const detail = document.createElement('div');
       detail.className = 'red-detail';
-      // Covered by info
       const coveredBy = r.covered_by.map(obj => {
         const entries = Object.entries(obj);
-        return entries.map(([k, v]) => k + ' ' + v.toFixed(1) + '%').join(', ');
+        return entries.map(([k, v]) => sanitize(k) + ' ' + fmtPct(v)).join(', ');
       }).join(', ');
       detail.textContent = (coveredBy ? 'Coperto da: ' + coveredBy : '') +
-        (r.ter_waste_eur > 0 ? ' \u00B7 TER sprecato: \u20AC' + r.ter_waste_eur.toFixed(2) : '');
+        (r.ter_waste_eur > 0 ? ' \u00B7 TER sprecato: ' + fmtEur(r.ter_waste_eur) : '');
 
       card.append(ticker, pct, progWrap, detail);
       grid.appendChild(card);
@@ -91,7 +89,6 @@ export function renderOverlap(container, data) {
     hmCard.appendChild(hmContainer);
     container.appendChild(hmCard);
 
-    // Render after DOM insertion
     requestAnimationFrame(() => {
       renderHeatmap('heatmap-container', overlap.matrix, overlap.tickers);
     });

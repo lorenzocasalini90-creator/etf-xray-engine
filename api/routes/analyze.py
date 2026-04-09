@@ -37,6 +37,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _clean_str(val) -> str:
+    """Sanitize a string to clean UTF-8, removing garbled chars."""
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return ""
+    s = str(val)
+    # Re-encode to drop invalid sequences
+    return s.encode("utf-8", errors="replace").decode("utf-8").strip()
+
+
 def _fetch_all(
     positions: list[dict],
     orchestrator: FetchOrchestrator,
@@ -449,14 +458,14 @@ async def analyze_portfolio(request: PortfolioRequest):
     for rank, (_, row) in enumerate(aggregated.head(100).iterrows(), 1):
         holdings_list.append(HoldingRow(
             rank=rank,
-            name=row.get("name", ""),
-            ticker=row.get("ticker", ""),
+            name=_clean_str(row.get("name", "")),
+            ticker=_clean_str(row.get("ticker", "")),
             isin=None,
             weight_pct=round(row.get("real_weight_pct", 0), 4),
             value_eur=round(row.get("real_weight_pct", 0) / 100 * total_capital, 2),
             n_etfs=int(row.get("n_etf_sources", 1)),
-            sector=row.get("sector") if pd.notna(row.get("sector")) else None,
-            country=row.get("country") if pd.notna(row.get("country")) else None,
+            sector=_clean_str(row.get("sector")) or None,
+            country=_clean_str(row.get("country")) or None,
         ))
 
     # 12. Fetch metadata

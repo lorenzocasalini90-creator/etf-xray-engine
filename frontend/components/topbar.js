@@ -1,8 +1,6 @@
 /**
- * Topbar — sticky nav with logo, anchor links, portfolio chip.
- * All dynamic text is escaped via sanitize.js to prevent XSS.
+ * Topbar — sticky nav with logo, anchor links, portfolio chip, PDF button.
  */
-import { esc } from './sanitize.js';
 
 const SECTIONS = [
   { id: 's-xray',    label: '\u2460 X-Ray' },
@@ -14,7 +12,6 @@ const SECTIONS = [
 let _observer = null;
 
 export function renderTopbar(container) {
-  // Build DOM safely
   container.textContent = '';
 
   const logo = document.createElement('div');
@@ -40,6 +37,15 @@ export function renderTopbar(container) {
   });
   container.appendChild(nav);
 
+  // PDF button (hidden until report visible)
+  const pdfBtn = document.createElement('button');
+  pdfBtn.className = 'btn-pdf no-print';
+  pdfBtn.id = 'topbar-pdf';
+  pdfBtn.textContent = '\uD83D\uDCC4 Esporta PDF';
+  pdfBtn.hidden = true;
+  pdfBtn.addEventListener('click', () => window.print());
+  container.appendChild(pdfBtn);
+
   const chip = document.createElement('div');
   chip.className = 'topbar-chip';
   chip.id = 'topbar-chip';
@@ -50,14 +56,17 @@ export function renderTopbar(container) {
 export function showNav(portfolioLabel) {
   const nav = document.getElementById('topbar-nav');
   const chip = document.getElementById('topbar-chip');
+  const pdf = document.getElementById('topbar-pdf');
   if (nav) nav.hidden = false;
+  if (pdf) pdf.hidden = false;
   if (chip) {
     chip.hidden = false;
-    chip.textContent = portfolioLabel;  // textContent is safe
+    chip.textContent = portfolioLabel;
     chip.onclick = () => {
       document.getElementById('report').hidden = true;
       document.getElementById('portfolio-input').hidden = false;
       if (nav) nav.hidden = true;
+      if (pdf) pdf.hidden = true;
       chip.hidden = true;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -71,7 +80,10 @@ export function setOverlapAlert(hasAlert) {
     if (a.dataset.section === 's-overlap') {
       if (hasAlert) {
         a.classList.add('alert');
-        a.textContent = '\u2461 Overlap !';
+        a.textContent = '\u2461 Overlap ';
+        const dot = document.createElement('span');
+        dot.className = 'pulse-dot';
+        a.appendChild(dot);
       } else {
         a.classList.remove('alert');
         a.textContent = '\u2461 Overlap';

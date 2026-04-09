@@ -85,6 +85,32 @@ input, select { font-family: inherit; }
 }
 .topbar-nav a.alert { color: var(--coral); }
 .topbar-nav a.alert.active { border-bottom-color: var(--coral); }
+.topbar-nav a.alert .pulse-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: var(--coral);
+  border-radius: 50%;
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* PDF export button */
+.btn-pdf {
+  padding: 5px 12px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  color: var(--text-s);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 6px;
+  margin-left: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btn-pdf:hover { background: var(--navy-pale); color: var(--navy); }
 .topbar-chip {
   font-size: 11px;
   font-weight: 500;
@@ -405,6 +431,7 @@ input, select { font-family: inherit; }
 }
 
 /* ── Report sections ──────────────────────────────── */
+.report-section:first-of-type { padding-top: 16px; border-top: none; }
 .report-section {
   padding: 32px 24px;
   max-width: 1100px;
@@ -494,6 +521,9 @@ input, select { font-family: inherit; }
   font-weight: 700;
   color: var(--navy);
 }
+.kpi-value.kpi-green { color: var(--accent); }
+.kpi-value.kpi-amber { color: var(--amber); }
+.kpi-value.kpi-coral { color: var(--coral); }
 
 /* ── Tables ───────────────────────────────────────── */
 .data-table {
@@ -522,6 +552,11 @@ input, select { font-family: inherit; }
   color: var(--navy);
 }
 .data-table .cell-muted { color: var(--text-t); }
+.data-table tbody tr:nth-child(even) { background: var(--bg); }
+
+/* Holding name + ticker compound cell */
+.holding-name { font-weight: 600; color: var(--text-p); display: block; }
+.holding-ticker { font-size: 11px; color: var(--text-t); font-family: 'DM Mono', monospace, 'DM Sans'; display: block; }
 
 /* Mini weight bar in table */
 .mini-bar-wrap {
@@ -782,3 +817,17 @@ input, select { font-family: inherit; }
 .stagger-2 { animation-delay: 0.1s; }
 .stagger-3 { animation-delay: 0.15s; }
 .stagger-4 { animation-delay: 0.2s; }
+
+/* ── Print styles ─────────────────────────────────── */
+@media print {
+  body { background: #fff; font-size: 11px; }
+  #topbar, #portfolio-input, #loading-overlay,
+  .hero-edit, .btn-pdf, .no-print, .expander-btn { display: none !important; }
+  #report { display: block !important; }
+  #report[hidden] { display: block !important; }
+  #hero-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-section { page-break-inside: avoid; padding: 16px 0; }
+  .card { page-break-inside: avoid; }
+  .plotly-chart { page-break-inside: avoid; }
+  .kpi-grid { page-break-inside: avoid; }
+}

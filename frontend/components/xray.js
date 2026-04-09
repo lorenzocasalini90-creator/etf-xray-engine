@@ -1,15 +1,13 @@
 /**
  * X-Ray section — holdings table + active bets + KPI cards.
- * Uses DOM API for safe rendering.
  */
-import { esc } from './sanitize.js';
+import { sanitize, fmtEur, fmtPct, fmtNum } from './sanitize.js';
 
 export function renderXRay(container, data) {
   const { holdings, active_bets, insights, kpis } = data;
   container.textContent = '';
   container.classList.add('fade-in');
 
-  // Section header
   const header = _makeHeader('1', 'X-Ray', 'Composizione aggregata del portafoglio');
   container.appendChild(header);
 
@@ -22,20 +20,21 @@ export function renderXRay(container, data) {
     icon.className = 'alert-icon';
     icon.textContent = '\u26A0';
     const text = document.createElement('span');
-    text.textContent = ins.body;
+    text.textContent = sanitize(ins.body);
     banner.append(icon, text);
     container.appendChild(banner);
   });
 
-  // KPI cards
+  // KPI cards with semantic colors
   const terWaste = data.redundancy
     ? data.redundancy.reduce((s, r) => s + r.ter_waste_eur, 0)
     : 0;
+  const asClass = kpis.active_share > 40 ? 'kpi-green' : kpis.active_share > 20 ? 'kpi-amber' : 'kpi-coral';
   const kpiData = [
-    { label: 'Titoli unici', value: kpis.unique_securities.toLocaleString() },
-    { label: 'Active Share', value: kpis.active_share.toFixed(1) + '%' },
-    { label: 'HHI (concentrazione)', value: (kpis.hhi * 10000).toFixed(0) },
-    { label: 'TER inefficienza', value: '\u20AC ' + terWaste.toFixed(0) + '/anno' },
+    { label: 'Titoli unici', value: fmtNum(kpis.unique_securities), cls: '' },
+    { label: 'Active Share', value: fmtPct(kpis.active_share), cls: asClass },
+    { label: 'HHI (concentrazione)', value: (kpis.hhi * 10000).toFixed(0), cls: '' },
+    { label: 'TER inefficienza', value: fmtEur(terWaste) + '/anno', cls: 'kpi-coral' },
   ];
   const kpiGrid = document.createElement('div');
   kpiGrid.className = 'kpi-grid';
@@ -46,7 +45,7 @@ export function renderXRay(container, data) {
     lbl.className = 'kpi-label';
     lbl.textContent = k.label;
     const val = document.createElement('div');
-    val.className = 'kpi-value';
+    val.className = 'kpi-value' + (k.cls ? ' ' + k.cls : '');
     val.textContent = k.value;
     card.append(lbl, val);
     kpiGrid.appendChild(card);
@@ -57,7 +56,7 @@ export function renderXRay(container, data) {
   const grid = document.createElement('div');
   grid.className = 'grid-2';
 
-  // Left: holdings table
+  // Left: holdings table — NAME primary, ticker secondary
   const holdingsCard = document.createElement('div');
   holdingsCard.className = 'card';
   const holdingsTitle = document.createElement('div');
@@ -69,10 +68,10 @@ export function renderXRay(container, data) {
   table.className = 'data-table';
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
-  ['#', 'Nome', 'Ticker', 'Peso %', 'Valore', 'Settore'].forEach(h => {
+  ['#', 'Titolo', 'Peso', 'Valore', 'Settore'].forEach(h => {
     const th = document.createElement('th');
     th.textContent = h;
-    if (['Peso %', 'Valore', '#'].includes(h)) th.className = 'num';
+    if (['Peso', 'Valore', '#'].includes(h)) th.className = 'num';
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -84,13 +83,10 @@ export function renderXRay(container, data) {
   const visibleHoldings = holdings.slice(0, displayCount);
   const remainingHoldings = holdings.slice(displayCount, 30);
 
-  visibleHoldings.forEach(h => {
-    tbody.appendChild(_makeHoldingRow(h, maxWeight));
-  });
+  visibleHoldings.forEach(h => tbody.appendChild(_makeHoldingRow(h, maxWeight)));
   table.appendChild(tbody);
   holdingsCard.appendChild(table);
 
-  // Expander
   if (remainingHoldings.length > 0) {
     const expandBtn = document.createElement('button');
     expandBtn.className = 'expander-btn';
@@ -125,25 +121,19 @@ export function renderXRay(container, data) {
     noData.textContent = 'Nessun benchmark selezionato';
     betsCard.appendChild(noData);
   } else {
-    // Overweight
     if (active_bets.overweight.length > 0) {
       const owLabel = document.createElement('div');
       owLabel.style.cssText = 'font-size:11px;font-weight:600;color:var(--text-t);margin-bottom:6px';
       owLabel.textContent = 'SOVRAPPESO';
       betsCard.appendChild(owLabel);
-      active_bets.overweight.slice(0, 8).forEach(b => {
-        betsCard.appendChild(_makeBetRow(b, true));
-      });
+      active_bets.overweight.slice(0, 8).forEach(b => betsCard.appendChild(_makeBetRow(b, true)));
     }
-    // Underweight
     if (active_bets.underweight.length > 0) {
       const uwLabel = document.createElement('div');
       uwLabel.style.cssText = 'font-size:11px;font-weight:600;color:var(--text-t);margin:14px 0 6px';
       uwLabel.textContent = 'SOTTOPESO';
       betsCard.appendChild(uwLabel);
-      active_bets.underweight.slice(0, 5).forEach(b => {
-        betsCard.appendChild(_makeBetRow(b, false));
-      });
+      active_bets.underweight.slice(0, 5).forEach(b => betsCard.appendChild(_makeBetRow(b, false)));
     }
   }
   grid.appendChild(betsCard);
@@ -168,21 +158,25 @@ function _makeHeader(num, title, desc) {
 
 function _makeHoldingRow(h, maxWeight) {
   const tr = document.createElement('tr');
+
   const tdRank = document.createElement('td');
   tdRank.className = 'num cell-muted';
   tdRank.textContent = h.rank;
-  const tdName = document.createElement('td');
-  tdName.textContent = h.name;
-  tdName.style.maxWidth = '180px';
-  tdName.style.overflow = 'hidden';
-  tdName.style.textOverflow = 'ellipsis';
-  tdName.style.whiteSpace = 'nowrap';
-  const tdTicker = document.createElement('td');
-  tdTicker.className = 'cell-ticker';
-  tdTicker.textContent = h.ticker || '';
+
+  // Combined name + ticker cell (B3: name primary)
+  const tdTitle = document.createElement('td');
+  tdTitle.style.maxWidth = '220px';
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'holding-name';
+  nameSpan.textContent = sanitize(h.name);
+  const tickerSpan = document.createElement('span');
+  tickerSpan.className = 'holding-ticker';
+  tickerSpan.textContent = h.ticker || '';
+  tdTitle.append(nameSpan, tickerSpan);
+
   const tdWeight = document.createElement('td');
   tdWeight.className = 'num';
-  tdWeight.textContent = h.weight_pct.toFixed(2) + '%';
+  tdWeight.textContent = fmtPct(h.weight_pct);
   const bar = document.createElement('span');
   bar.className = 'mini-bar-wrap';
   const fill = document.createElement('span');
@@ -190,17 +184,20 @@ function _makeHoldingRow(h, maxWeight) {
   fill.style.width = (h.weight_pct / maxWeight * 100).toFixed(0) + '%';
   bar.appendChild(fill);
   tdWeight.appendChild(bar);
+
   const tdVal = document.createElement('td');
   tdVal.className = 'num';
-  tdVal.textContent = '\u20AC ' + h.value_eur.toLocaleString('it-IT', {maximumFractionDigits: 0});
+  tdVal.textContent = fmtEur(h.value_eur);
+
   const tdSector = document.createElement('td');
   tdSector.className = 'cell-muted';
-  tdSector.textContent = h.sector || '';
+  tdSector.textContent = sanitize(h.sector) || '';
   tdSector.style.maxWidth = '120px';
   tdSector.style.overflow = 'hidden';
   tdSector.style.textOverflow = 'ellipsis';
   tdSector.style.whiteSpace = 'nowrap';
-  tr.append(tdRank, tdName, tdTicker, tdWeight, tdVal, tdSector);
+
+  tr.append(tdRank, tdTitle, tdWeight, tdVal, tdSector);
   return tr;
 }
 
@@ -209,11 +206,11 @@ function _makeBetRow(bet, isOver) {
   row.className = 'bet-row';
   const name = document.createElement('span');
   name.className = 'bet-name';
-  name.textContent = bet.name || bet.ticker;
+  name.textContent = sanitize(bet.name) || bet.ticker;
   const delta = document.createElement('span');
   delta.className = 'bet-delta ' + (isOver ? 'pos' : 'neg');
   const sign = bet.delta_pct >= 0 ? '+' : '';
-  delta.textContent = sign + (bet.delta_pct * 100).toFixed(2) + '%';
+  delta.textContent = sign + fmtPct(bet.delta_pct * 100);
   row.append(name, delta);
   return row;
 }

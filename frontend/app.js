@@ -1,6 +1,6 @@
 /**
  * CheckMyETFs — main application entry point.
- * Orchestrates form → API call → report rendering.
+ * Orchestrates form -> API call -> report rendering.
  */
 
 import { renderTopbar, showNav, setOverlapAlert } from './components/topbar.js';
@@ -10,8 +10,17 @@ import { renderXRay } from './components/xray.js';
 import { renderOverlap } from './components/overlap.js';
 import { renderSector } from './components/sector.js';
 import { renderFactor } from './components/factor.js';
+import { fmtEur } from './components/sanitize.js';
 
-// Initialize
+// Progress messages shown during loading
+const PROGRESS_MSGS = [
+  { t: 0,  msg: 'Scarico composizione ETF...' },
+  { t: 5,  msg: 'Calcolo esposizione reale...' },
+  { t: 10, msg: 'Analizzo overlap e ridondanza...' },
+  { t: 15, msg: 'Calcolo factor fingerprint...' },
+  { t: 20, msg: 'Quasi pronto...' },
+];
+
 document.addEventListener('DOMContentLoaded', () => {
   renderTopbar(document.getElementById('topbar'));
   renderPortfolioForm(document.getElementById('portfolio-input'), onAnalyze);
@@ -19,11 +28,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function onAnalyze(positions, benchmark) {
   const loading = document.getElementById('loading-overlay');
+  const loadingMsg = document.getElementById('loading-msg');
   const inputSection = document.getElementById('portfolio-input');
   const report = document.getElementById('report');
 
-  // Show loading
+  // Show loading with progress messages
   loading.hidden = false;
+  loadingMsg.textContent = PROGRESS_MSGS[0].msg;
+  let elapsed = 0;
+  const msgInterval = setInterval(() => {
+    elapsed += 1;
+    const step = PROGRESS_MSGS.filter(m => m.t <= elapsed).pop();
+    if (step && loadingMsg) loadingMsg.textContent = step.msg;
+  }, 1000);
 
   try {
     const body = { positions };
@@ -42,20 +59,12 @@ async function onAnalyze(positions, benchmark) {
 
     const data = await res.json();
 
-    // Hide form, show report
     inputSection.hidden = true;
     report.hidden = false;
 
-    // Calculate total EUR
     const totalEur = positions.reduce((s, p) => s + p.amount_eur, 0);
 
-    // Render all sections
-    renderHero(
-      document.getElementById('hero-bar'),
-      data.kpis,
-      data.fetch_metadata,
-      totalEur,
-    );
+    renderHero(document.getElementById('hero-bar'), data.kpis, data.fetch_metadata, totalEur);
 
     renderXRay(document.getElementById('s-xray'), {
       holdings: data.holdings,
@@ -76,27 +85,22 @@ async function onAnalyze(positions, benchmark) {
       country_exposure: data.country_exposure,
     });
 
-    renderFactor(document.getElementById('s-factor'), {
-      factors: data.factors,
-    });
+    renderFactor(document.getElementById('s-factor'), { factors: data.factors });
 
     // Update topbar
     const nEtfs = positions.length;
-    const label = nEtfs + ' ETF \u00B7 \u20AC' + totalEur.toLocaleString('it-IT');
+    const label = nEtfs + ' ETF \u00B7 ' + fmtEur(totalEur);
     showNav(label);
 
-    // Check overlap alert
     const maxRedundancy = data.redundancy.length > 0
       ? Math.max(...data.redundancy.map(r => r.redundancy_pct))
       : 0;
     setOverlapAlert(maxRedundancy > 70);
 
-    // Scroll to X-Ray
     requestAnimationFrame(() => {
       document.getElementById('s-xray').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-    // Track in GA4
     if (typeof gtag === 'function') {
       gtag('event', 'analyze_portfolio', {
         n_etfs: nEtfs,
@@ -110,12 +114,12 @@ async function onAnalyze(positions, benchmark) {
     inputSection.hidden = false;
     _showError(inputSection, err.message);
   } finally {
+    clearInterval(msgInterval);
     loading.hidden = true;
   }
 }
 
 function _showError(container, message) {
-  // Remove any previous error
   const prev = container.querySelector('.error-card');
   if (prev) prev.remove();
 

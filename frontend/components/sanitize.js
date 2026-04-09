@@ -1,13 +1,9 @@
 /**
- * HTML text sanitization utility.
- * All user/API data must pass through esc() before insertion into innerHTML.
+ * Sanitization + formatting utilities.
+ * All user/API data must pass through esc()/sanitize() before DOM insertion.
  */
 
-/**
- * Escape HTML special characters to prevent XSS.
- * @param {*} val — value to escape (converted to string)
- * @returns {string} — safe HTML string
- */
+/** Escape HTML special characters to prevent XSS. */
 export function esc(val) {
   if (val === null || val === undefined) return '';
   const str = String(val);
@@ -16,22 +12,28 @@ export function esc(val) {
   return div.innerHTML;
 }
 
-/**
- * Format a number as EUR with Italian locale.
- * @param {number} n
- * @returns {string} — escaped formatted string
- */
-export function fmtEur(n) {
-  return esc(Number(n).toLocaleString('it-IT'));
+/** Sanitize a string: remove non-printable chars, keep unicode letters. */
+export function sanitize(str) {
+  if (!str) return '';
+  return String(str).replace(/[\x00-\x1F\x7F]/g, '').trim();
 }
 
-/**
- * Format a number with fixed decimals.
- * @param {number} n
- * @param {number} decimals
- * @returns {string}
- */
-export function fmtNum(n, decimals = 1) {
-  if (n === null || n === undefined || isNaN(n)) return '—';
-  return esc(Number(n).toFixed(decimals));
+/** Format EUR with Italian locale (€ 40.000). */
+export function fmtEur(n) {
+  if (n === null || n === undefined || isNaN(n)) return '\u2014';
+  return new Intl.NumberFormat('it-IT', {
+    style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
+  }).format(n);
+}
+
+/** Format percentage with 2 decimals (14.50%). */
+export function fmtPct(n) {
+  if (n === null || n === undefined || isNaN(n)) return '\u2014';
+  return Number(n).toFixed(2) + '%';
+}
+
+/** Format integer with Italian locale separators (4.340). */
+export function fmtNum(n) {
+  if (n === null || n === undefined || isNaN(n)) return '\u2014';
+  return new Intl.NumberFormat('it-IT').format(n);
 }

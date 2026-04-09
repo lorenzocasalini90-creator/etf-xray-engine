@@ -1,20 +1,20 @@
 /**
  * Hero bar — navy strip with KPI stats.
- * Uses DOM API (no innerHTML with untrusted data).
  */
+import { fmtEur, fmtPct, fmtNum } from './sanitize.js';
 
 export function renderHero(container, kpis, fetchMetadata, totalEur) {
   container.textContent = '';
 
   const stats = [
-    { label: 'Portafoglio', value: '\u20AC ' + totalEur.toLocaleString('it-IT'), cls: '' },
-    { label: 'Titoli Unici', value: kpis.unique_securities.toLocaleString(), cls: '' },
+    { label: 'Portafoglio', value: fmtEur(totalEur), cls: '' },
+    { label: 'Titoli Unici', value: fmtNum(kpis.unique_securities), cls: '' },
     { label: 'HHI', value: (kpis.hhi * 10000).toFixed(0),
       cls: kpis.hhi > 0.15 ? 'coral' : kpis.hhi > 0.05 ? 'amber' : 'green' },
     { label: 'Effective N', value: kpis.effective_n.toFixed(0), cls: '' },
-    { label: 'Active Share', value: kpis.active_share.toFixed(1) + '%',
-      cls: kpis.active_share < 20 ? 'amber' : kpis.active_share > 60 ? 'green' : '' },
-    { label: 'Top 10', value: kpis.top10_concentration.toFixed(1) + '%',
+    { label: 'Active Share', value: fmtPct(kpis.active_share),
+      cls: kpis.active_share < 20 ? 'coral' : kpis.active_share > 60 ? 'green' : 'amber' },
+    { label: 'Top 10', value: fmtPct(kpis.top10_concentration),
       cls: kpis.top10_concentration > 50 ? 'coral' : kpis.top10_concentration > 30 ? 'amber' : 'green' },
     { label: 'Copertura', value: fetchMetadata.coverage_pct.toFixed(0) + '%', cls: '' },
   ];
@@ -40,6 +40,7 @@ export function renderHero(container, kpis, fetchMetadata, totalEur) {
     document.getElementById('portfolio-input').hidden = false;
     document.getElementById('topbar-nav').hidden = true;
     document.getElementById('topbar-chip').hidden = true;
+    document.getElementById('topbar-pdf').hidden = true;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
   container.appendChild(editBtn);

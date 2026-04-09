@@ -112,7 +112,7 @@ function _render() {
       name.textContent = p.name || '';
       const amount = document.createElement('span');
       amount.className = 'etf-amount';
-      amount.textContent = '\u20AC ' + p.capital.toLocaleString('it-IT');
+      amount.textContent = fmtEur(p.capital);
       const removeBtn = document.createElement('button');
       removeBtn.className = 'etf-remove';
       removeBtn.textContent = '\u00D7';
@@ -139,7 +139,7 @@ function _render() {
 
     const totalDiv = document.createElement('div');
     totalDiv.className = 'form-total';
-    totalDiv.innerHTML = 'Totale: <strong>\u20AC ' + esc(total.toLocaleString('it-IT')) + '</strong>';
+    totalDiv.innerHTML = 'Totale: <strong>' + esc(fmtEur(total)) + '</strong>';
     card.appendChild(totalDiv);
   }
 
