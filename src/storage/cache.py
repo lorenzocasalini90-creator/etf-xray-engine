@@ -11,7 +11,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.ingestion.base_fetcher import FetchResult
@@ -110,35 +111,43 @@ class HoldingsCacheManager:
         now = datetime.now(timezone.utc)
         holdings_json = df.to_json(orient="split", date_format="iso")
 
+        clean_id = identifier.upper().strip()
+        stale_after = now + timedelta(days=CACHE_TTL_DAYS)
+        values = dict(
+            source=source,
+            holdings_json=holdings_json,
+            fetched_at=now,
+            stale_after=stale_after,
+            coverage_pct=coverage_pct,
+            num_holdings=len(df),
+            status=status,
+        )
+
         with self._session_factory() as session:
             entry = session.execute(
                 select(HoldingsCache).where(
-                    HoldingsCache.etf_identifier == identifier.upper().strip()
+                    HoldingsCache.etf_identifier == clean_id
                 )
             ).scalar_one_or_none()
 
             if entry:
-                entry.source = source
-                entry.holdings_json = holdings_json
-                entry.fetched_at = now
-                entry.stale_after = now + timedelta(days=CACHE_TTL_DAYS)
-                entry.coverage_pct = coverage_pct
-                entry.num_holdings = len(df)
-                entry.status = status
+                for k, v in values.items():
+                    setattr(entry, k, v)
+                session.commit()
             else:
-                entry = HoldingsCache(
-                    etf_identifier=identifier.upper().strip(),
-                    source=source,
-                    holdings_json=holdings_json,
-                    fetched_at=now,
-                    stale_after=now + timedelta(days=CACHE_TTL_DAYS),
-                    coverage_pct=coverage_pct,
-                    num_holdings=len(df),
-                    status=status,
-                )
-                session.add(entry)
-
-            session.commit()
+                try:
+                    new_entry = HoldingsCache(etf_identifier=clean_id, **values)
+                    session.add(new_entry)
+                    session.commit()
+                except IntegrityError:
+                    # Another thread inserted first — update instead
+                    session.rollback()
+                    session.execute(
+                        update(HoldingsCache)
+                        .where(HoldingsCache.etf_identifier == clean_id)
+                        .values(**values)
+                    )
+                    session.commit()
 
     def is_fresh(self, identifier: str) -> bool:
         """Return True if cache for *identifier* is valid (< TTL).
