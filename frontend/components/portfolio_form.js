@@ -196,14 +196,26 @@ function _render() {
   tickerInput.addEventListener('input', _onSearchInput);
   btnCta.addEventListener('click', _submit);
   btnSave.addEventListener('click', () => {
+    // Save to localStorage AND download as JSON file
     localStorage.setItem('cmf_portfolio', JSON.stringify(_positions));
+    const blob = new Blob([JSON.stringify(_positions, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'portafoglio_checkmyetfs.json';
+    a.click();
+    URL.revokeObjectURL(url);
     btnSave.textContent = '\u2713 Salvato';
     setTimeout(() => { btnSave.textContent = '\uD83D\uDCBE Salva'; }, 1500);
   });
-  btnLoad.addEventListener('click', () => {
-    const saved = localStorage.getItem('cmf_portfolio');
-    if (saved) { try { _positions = JSON.parse(saved); _render(); } catch(e) {} }
-  });
+  // Load: open file picker for saved JSON portfolio
+  const jsonInput = document.createElement('input');
+  jsonInput.type = 'file';
+  jsonInput.accept = '.json';
+  jsonInput.hidden = true;
+  jsonInput.addEventListener('change', _onJsonLoad);
+  card.appendChild(jsonInput);
+  btnLoad.addEventListener('click', () => jsonInput.click());
   fileInput.addEventListener('change', _onFileUpload);
 
   // Close autocomplete on outside click
@@ -288,7 +300,32 @@ function _onFileUpload(e) {
     }
     _render();
   };
-  reader.readAsText(file);
+  reader.readAsText(file, 'UTF-8');
+}
+
+function _onJsonLoad(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = JSON.parse(evt.target.result);
+      // Accept both array format [{ticker, capital}] and wrapped {positions: [...]}
+      const arr = Array.isArray(data) ? data : (data.positions || []);
+      if (!Array.isArray(arr) || arr.length === 0) return;
+      _positions = arr.filter(p => p.ticker && p.capital > 0).slice(0, 10).map(p => ({
+        ticker: String(p.ticker).trim().toUpperCase(),
+        capital: Number(p.capital) || 0,
+        name: p.name || '',
+      }));
+      _render();
+    } catch (err) {
+      /* ignore malformed JSON */
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+  // Reset so the same file can be loaded again
+  e.target.value = '';
 }
 
 export function getPositions() { return _positions; }
