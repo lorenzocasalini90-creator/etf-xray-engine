@@ -1,0 +1,219 @@
+/**
+ * X-Ray section — holdings table + active bets + KPI cards.
+ * Uses DOM API for safe rendering.
+ */
+import { esc } from './sanitize.js';
+
+export function renderXRay(container, data) {
+  const { holdings, active_bets, insights, kpis } = data;
+  container.textContent = '';
+  container.classList.add('fade-in');
+
+  // Section header
+  const header = _makeHeader('1', 'X-Ray', 'Composizione aggregata del portafoglio');
+  container.appendChild(header);
+
+  // Critical alerts
+  const criticals = (insights || []).filter(i => i.severity === 'critical');
+  criticals.forEach(ins => {
+    const banner = document.createElement('div');
+    banner.className = 'alert-banner critical';
+    const icon = document.createElement('span');
+    icon.className = 'alert-icon';
+    icon.textContent = '\u26A0';
+    const text = document.createElement('span');
+    text.textContent = ins.body;
+    banner.append(icon, text);
+    container.appendChild(banner);
+  });
+
+  // KPI cards
+  const terWaste = data.redundancy
+    ? data.redundancy.reduce((s, r) => s + r.ter_waste_eur, 0)
+    : 0;
+  const kpiData = [
+    { label: 'Titoli unici', value: kpis.unique_securities.toLocaleString() },
+    { label: 'Active Share', value: kpis.active_share.toFixed(1) + '%' },
+    { label: 'HHI (concentrazione)', value: (kpis.hhi * 10000).toFixed(0) },
+    { label: 'TER inefficienza', value: '\u20AC ' + terWaste.toFixed(0) + '/anno' },
+  ];
+  const kpiGrid = document.createElement('div');
+  kpiGrid.className = 'kpi-grid';
+  kpiData.forEach((k, i) => {
+    const card = document.createElement('div');
+    card.className = 'kpi-card stagger-' + (i + 1);
+    const lbl = document.createElement('div');
+    lbl.className = 'kpi-label';
+    lbl.textContent = k.label;
+    const val = document.createElement('div');
+    val.className = 'kpi-value';
+    val.textContent = k.value;
+    card.append(lbl, val);
+    kpiGrid.appendChild(card);
+  });
+  container.appendChild(kpiGrid);
+
+  // Two-column layout
+  const grid = document.createElement('div');
+  grid.className = 'grid-2';
+
+  // Left: holdings table
+  const holdingsCard = document.createElement('div');
+  holdingsCard.className = 'card';
+  const holdingsTitle = document.createElement('div');
+  holdingsTitle.className = 'card-title';
+  holdingsTitle.textContent = 'Top Holdings';
+  holdingsCard.appendChild(holdingsTitle);
+
+  const table = document.createElement('table');
+  table.className = 'data-table';
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  ['#', 'Nome', 'Ticker', 'Peso %', 'Valore', 'Settore'].forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    if (['Peso %', 'Valore', '#'].includes(h)) th.className = 'num';
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  const maxWeight = holdings.length > 0 ? holdings[0].weight_pct : 1;
+  const displayCount = 10;
+  const visibleHoldings = holdings.slice(0, displayCount);
+  const remainingHoldings = holdings.slice(displayCount, 30);
+
+  visibleHoldings.forEach(h => {
+    tbody.appendChild(_makeHoldingRow(h, maxWeight));
+  });
+  table.appendChild(tbody);
+  holdingsCard.appendChild(table);
+
+  // Expander
+  if (remainingHoldings.length > 0) {
+    const expandBtn = document.createElement('button');
+    expandBtn.className = 'expander-btn';
+    expandBtn.textContent = 'Mostra altri ' + remainingHoldings.length + ' titoli \u25BC';
+    let expanded = false;
+    expandBtn.addEventListener('click', () => {
+      if (!expanded) {
+        remainingHoldings.forEach(h => tbody.appendChild(_makeHoldingRow(h, maxWeight)));
+        expandBtn.textContent = 'Nascondi \u25B2';
+        expanded = true;
+      } else {
+        while (tbody.children.length > displayCount) tbody.removeChild(tbody.lastChild);
+        expandBtn.textContent = 'Mostra altri ' + remainingHoldings.length + ' titoli \u25BC';
+        expanded = false;
+      }
+    });
+    holdingsCard.appendChild(expandBtn);
+  }
+  grid.appendChild(holdingsCard);
+
+  // Right: active bets
+  const betsCard = document.createElement('div');
+  betsCard.className = 'card';
+  const betsTitle = document.createElement('div');
+  betsTitle.className = 'card-title';
+  betsTitle.textContent = 'Active Bets vs Benchmark';
+  betsCard.appendChild(betsTitle);
+
+  if (active_bets.overweight.length === 0 && active_bets.underweight.length === 0) {
+    const noData = document.createElement('p');
+    noData.style.cssText = 'color:var(--text-t);font-size:12px;text-align:center;padding:20px 0';
+    noData.textContent = 'Nessun benchmark selezionato';
+    betsCard.appendChild(noData);
+  } else {
+    // Overweight
+    if (active_bets.overweight.length > 0) {
+      const owLabel = document.createElement('div');
+      owLabel.style.cssText = 'font-size:11px;font-weight:600;color:var(--text-t);margin-bottom:6px';
+      owLabel.textContent = 'SOVRAPPESO';
+      betsCard.appendChild(owLabel);
+      active_bets.overweight.slice(0, 8).forEach(b => {
+        betsCard.appendChild(_makeBetRow(b, true));
+      });
+    }
+    // Underweight
+    if (active_bets.underweight.length > 0) {
+      const uwLabel = document.createElement('div');
+      uwLabel.style.cssText = 'font-size:11px;font-weight:600;color:var(--text-t);margin:14px 0 6px';
+      uwLabel.textContent = 'SOTTOPESO';
+      betsCard.appendChild(uwLabel);
+      active_bets.underweight.slice(0, 5).forEach(b => {
+        betsCard.appendChild(_makeBetRow(b, false));
+      });
+    }
+  }
+  grid.appendChild(betsCard);
+  container.appendChild(grid);
+}
+
+function _makeHeader(num, title, desc) {
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  const numEl = document.createElement('span');
+  numEl.className = 'section-num';
+  numEl.textContent = num;
+  const titleEl = document.createElement('span');
+  titleEl.className = 'section-title';
+  titleEl.textContent = title;
+  const descEl = document.createElement('span');
+  descEl.className = 'section-desc';
+  descEl.textContent = desc;
+  header.append(numEl, titleEl, descEl);
+  return header;
+}
+
+function _makeHoldingRow(h, maxWeight) {
+  const tr = document.createElement('tr');
+  const tdRank = document.createElement('td');
+  tdRank.className = 'num cell-muted';
+  tdRank.textContent = h.rank;
+  const tdName = document.createElement('td');
+  tdName.textContent = h.name;
+  tdName.style.maxWidth = '180px';
+  tdName.style.overflow = 'hidden';
+  tdName.style.textOverflow = 'ellipsis';
+  tdName.style.whiteSpace = 'nowrap';
+  const tdTicker = document.createElement('td');
+  tdTicker.className = 'cell-ticker';
+  tdTicker.textContent = h.ticker || '';
+  const tdWeight = document.createElement('td');
+  tdWeight.className = 'num';
+  tdWeight.textContent = h.weight_pct.toFixed(2) + '%';
+  const bar = document.createElement('span');
+  bar.className = 'mini-bar-wrap';
+  const fill = document.createElement('span');
+  fill.className = 'mini-bar-fill';
+  fill.style.width = (h.weight_pct / maxWeight * 100).toFixed(0) + '%';
+  bar.appendChild(fill);
+  tdWeight.appendChild(bar);
+  const tdVal = document.createElement('td');
+  tdVal.className = 'num';
+  tdVal.textContent = '\u20AC ' + h.value_eur.toLocaleString('it-IT', {maximumFractionDigits: 0});
+  const tdSector = document.createElement('td');
+  tdSector.className = 'cell-muted';
+  tdSector.textContent = h.sector || '';
+  tdSector.style.maxWidth = '120px';
+  tdSector.style.overflow = 'hidden';
+  tdSector.style.textOverflow = 'ellipsis';
+  tdSector.style.whiteSpace = 'nowrap';
+  tr.append(tdRank, tdName, tdTicker, tdWeight, tdVal, tdSector);
+  return tr;
+}
+
+function _makeBetRow(bet, isOver) {
+  const row = document.createElement('div');
+  row.className = 'bet-row';
+  const name = document.createElement('span');
+  name.className = 'bet-name';
+  name.textContent = bet.name || bet.ticker;
+  const delta = document.createElement('span');
+  delta.className = 'bet-delta ' + (isOver ? 'pos' : 'neg');
+  const sign = bet.delta_pct >= 0 ? '+' : '';
+  delta.textContent = sign + (bet.delta_pct * 100).toFixed(2) + '%';
+  row.append(name, delta);
+  return row;
+}

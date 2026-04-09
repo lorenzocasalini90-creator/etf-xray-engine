@@ -4,21 +4,49 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CheckMyETFs — Analizza il tuo portafoglio ETF</title>
+  <meta name="description" content="Analisi gratuita del portafoglio ETF: overlap, ridondanza, esposizione settoriale, factor fingerprint.">
 
   <!-- Google Analytics -->
-  <script async
-    src="https://www.googletagmanager.com/gtag/js?id=G-E6YX8DRY3Z">
-  </script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-E6YX8DRY3Z"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', 'G-E6YX8DRY3Z');
   </script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>CheckMyETFs</h1>
-  <p>Frontend in costruzione.
-     <a href="/docs">Swagger API docs</a></p>
+
+  <nav id="topbar"></nav>
+
+  <section id="portfolio-input"></section>
+
+  <div id="loading-overlay" hidden>
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <p>Analisi in corso...</p>
+    </div>
+  </div>
+
+  <main id="report" hidden>
+    <div id="hero-bar"></div>
+    <section id="s-xray" class="report-section"></section>
+    <section id="s-overlap" class="report-section"></section>
+    <section id="s-sector" class="report-section"></section>
+    <section id="s-factor" class="report-section"></section>
+  </main>
+
+  <script type="module" src="app.js"></script>
 </body>
 </html>
