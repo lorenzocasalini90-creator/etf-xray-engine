@@ -21,6 +21,9 @@ app.include_router(holdings.router, prefix="/api", tags=["holdings"])
 app.include_router(etf_search.router, prefix="/api", tags=["etf_search"])
 app.include_router(benchmarks.router, prefix="/api", tags=["benchmarks"])
 
-# Placeholder for static files (activate in M2):
-# from fastapi.staticfiles import StaticFiles
-# app.mount("/", StaticFiles(directory="frontend", html=True))
+import os
+
+from fastapi.staticfiles import StaticFiles
+
+if os.path.exists("frontend"):
+    app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
