@@ -339,16 +339,17 @@ if run_analysis:
         # Re-enrich cached data so enrichment fixes apply without force-refresh
         try:
             from src.analytics.enrichment import enrich_missing_data
-            from src.storage.db import get_session_factory
+            from src.storage.db import get_session_factory, init_db
 
+            init_db()
             _sf = get_session_factory()
             _sess = _sf()
             st.session_state.aggregated = enrich_missing_data(
                 st.session_state.aggregated, db_session=_sess,
             )
             _sess.close()
-        except Exception:
-            pass
+        except Exception as exc:
+            st.warning(f"Enrichment parziale: {exc}")
         st.info(
             f"Usando risultati in cache (analizzato {elapsed_min:.0f} minuti fa). "
             "Premi '↺ Aggiorna dati' per forzare il ricalcolo."
