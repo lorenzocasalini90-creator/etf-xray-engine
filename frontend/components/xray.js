@@ -69,7 +69,7 @@ export function renderXRay(container, data) {
     lbl.className = 'kpi-label';
     lbl.textContent = k.label;
     const info = TOOLTIPS[k.label];
-    if (info) lbl.appendChild(makeInfoIcon(info));
+    if (info) lbl.appendChild(makeInfoIcon(info, {dark: false}));
     const val = document.createElement('div');
     val.className = 'kpi-value' + (k.cls ? ' ' + k.cls : '');
     val.textContent = k.value;

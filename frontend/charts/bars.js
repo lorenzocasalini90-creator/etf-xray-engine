@@ -16,7 +16,7 @@ export function renderBars(containerId, labels, values, colors, options = {}) {
     marker: { color: colors || '#1B2A4A', line: { width: 0 } },
     text: textVals,
     textposition: 'outside',
-    textfont: { family: 'DM Sans, sans-serif', size: 11, color: '#6B7280' },
+    textfont: { family: 'DM Sans, sans-serif', size: 12, color: '#374151' },
     hoverinfo: 'skip',
     cliponaxis: false,
   }];
@@ -25,13 +25,14 @@ export function renderBars(containerId, labels, values, colors, options = {}) {
     paper_bgcolor: 'white',
     plot_bgcolor: 'white',
     font: { family: 'DM Sans, sans-serif', size: 11, color: '#111827' },
-    margin: { l: 120, r: 50, t: 10, b: 20 },
+    margin: { l: 140, r: 70, t: 10, b: 20 },
     xaxis: {
       showgrid: true,
-      gridcolor: '#F3F4F6',
+      gridcolor: '#D1D5DB',
       gridwidth: 1,
-      griddash: 'dot',
-      zeroline: false,
+      griddash: 'dash',
+      zeroline: true,
+      zerolinecolor: '#9CA3AF',
       showticklabels: false,
     },
     yaxis: {

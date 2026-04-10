@@ -46,6 +46,26 @@ export function renderTopbar(container) {
   pdfBtn.addEventListener('click', () => window.print());
   container.appendChild(pdfBtn);
 
+  // Modify button — jumps back to the portfolio form
+  const modBtn = document.createElement('button');
+  modBtn.className = 'btn-pdf no-print';
+  modBtn.id = 'topbar-mod';
+  modBtn.textContent = '\u270F Modifica';
+  modBtn.hidden = true;
+  modBtn.addEventListener('click', () => {
+    document.getElementById('report').hidden = true;
+    document.getElementById('portfolio-input').hidden = false;
+    const nav = document.getElementById('topbar-nav');
+    const chipEl = document.getElementById('topbar-chip');
+    const pdf = document.getElementById('topbar-pdf');
+    if (nav) nav.hidden = true;
+    if (chipEl) chipEl.hidden = true;
+    if (pdf) pdf.hidden = true;
+    modBtn.hidden = true;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  container.appendChild(modBtn);
+
   const chip = document.createElement('div');
   chip.className = 'topbar-chip';
   chip.id = 'topbar-chip';
@@ -57,8 +77,10 @@ export function showNav(portfolioLabel) {
   const nav = document.getElementById('topbar-nav');
   const chip = document.getElementById('topbar-chip');
   const pdf = document.getElementById('topbar-pdf');
+  const mod = document.getElementById('topbar-mod');
   if (nav) nav.hidden = false;
   if (pdf) pdf.hidden = false;
+  if (mod) mod.hidden = false;
   if (chip) {
     chip.hidden = false;
     chip.textContent = portfolioLabel;
@@ -67,6 +89,7 @@ export function showNav(portfolioLabel) {
       document.getElementById('portfolio-input').hidden = false;
       if (nav) nav.hidden = true;
       if (pdf) pdf.hidden = true;
+      if (mod) mod.hidden = true;
       chip.hidden = true;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -101,11 +124,32 @@ function _setupObserver() {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         links.forEach(a => a.classList.remove('active'));
-        const active = document.querySelector(`.topbar-nav a[data-section="${entry.target.id}"]`);
+        const active = document.querySelector(
+          `.topbar-nav a[data-section="${entry.target.id}"]`
+        );
         if (active) active.classList.add('active');
       }
     });
-  }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+  }, {
+    rootMargin: '-60px 0px -40% 0px',
+    threshold: 0.1,
+  });
 
   sections.forEach(s => _observer.observe(s));
+
+  // Fallback: near the bottom of the page always highlight the last
+  // section (Factor) — the IntersectionObserver can miss it when the
+  // section is shorter than the viewport.
+  window.addEventListener('scroll', () => {
+    const nearBottom =
+      window.scrollY + window.innerHeight >
+      document.documentElement.scrollHeight - 120;
+    if (nearBottom) {
+      links.forEach(a => a.classList.remove('active'));
+      const factorLink = document.querySelector(
+        '.topbar-nav a[data-section="s-factor"]'
+      );
+      if (factorLink) factorLink.classList.add('active');
+    }
+  }, { passive: true });
 }

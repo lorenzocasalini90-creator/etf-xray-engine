@@ -3,6 +3,7 @@
  */
 import { sanitize, fmtEur, fmtPct } from './sanitize.js';
 import { renderHeatmap } from '../charts/heatmap.js';
+import { makeInfoIcon } from './tooltip.js';
 
 export function renderOverlap(container, data) {
   const { redundancy, overlap, insights } = data;
@@ -11,6 +12,20 @@ export function renderOverlap(container, data) {
 
   const header = _makeHeader('2', 'Overlap & Ridondanza', 'Quanto si sovrappongono i tuoi ETF');
   container.appendChild(header);
+
+  const introRow = document.createElement('div');
+  introRow.style.cssText =
+    'margin-bottom:20px;padding:12px 16px;' +
+    'background:var(--navy-pale);border-radius:8px;' +
+    'font-size:12px;color:var(--text-s);line-height:1.6;';
+  introRow.textContent =
+    'La ridondanza misura quanta parte di un ETF è già coperta ' +
+    'dagli altri ETF nel portafoglio. Un ETF con ridondanza 99% ' +
+    'significa che quasi tutte le sue holdings sono già presenti ' +
+    'altrove — stai pagando le commissioni senza aggiungere ' +
+    'diversificazione reale. La percentuale è calcolata come ' +
+    'peso sovrapposto normalizzato sul peso totale dell\u2019ETF.';
+  container.appendChild(introRow);
 
   // Edge case: 1 ETF — show empty state
   if (!redundancy || redundancy.length < 2) {
@@ -62,9 +77,25 @@ export function renderOverlap(container, data) {
       ticker.textContent = _displayName(r.etf_ticker);
       ticker.title = r.etf_ticker;
 
+      const isinSmall = document.createElement('div');
+      isinSmall.style.cssText =
+        'font-size:9px;color:var(--text-t);' +
+        'font-family:monospace;margin-bottom:4px;' +
+        'letter-spacing:0.3px;word-break:break-all;';
+      isinSmall.textContent = r.etf_ticker;
+
       const pct = document.createElement('div');
       pct.className = 'red-pct ' + pctClass;
       pct.textContent = fmtPct(r.redundancy_pct);
+
+      const pctRow = document.createElement('div');
+      pctRow.style.cssText = 'display:flex;align-items:center;gap:4px;';
+      const pctTip = makeInfoIcon(
+        'Percentuale del peso di questo ETF già coperta dagli ' +
+        'altri ETF nel portafoglio. Più alto = più ridondante.',
+        { dark: false }
+      );
+      pctRow.append(pct, pctTip);
 
       const progWrap = document.createElement('div');
       progWrap.className = 'progress';
@@ -76,21 +107,14 @@ export function renderOverlap(container, data) {
       const detail = document.createElement('div');
       detail.className = 'red-detail';
       const coveredBy = r.covered_by.map(obj => {
-        const entries = Object.entries(obj);
-        return entries.map(([k, v]) => sanitize(k) + ' ' + fmtPct(v)).join(', ');
+        return Object.entries(obj)
+          .map(([k, v]) => _displayName(sanitize(k)) + ' ' + fmtPct(v))
+          .join(', ');
       }).join(', ');
       detail.textContent = (coveredBy ? 'Coperto da: ' + coveredBy : '') +
         (r.ter_waste_eur > 0 ? ' \u00B7 TER sprecato: ' + fmtEur(r.ter_waste_eur) : '');
 
-      card.append(ticker, pct, progWrap, detail);
-      if (r.etf_name) {
-        const nameSmall = document.createElement('div');
-        nameSmall.style.cssText =
-          'font-size:10px;color:var(--text-t);margin-bottom:6px;' +
-          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-        nameSmall.textContent = sanitize(r.etf_name);
-        card.insertBefore(nameSmall, pct);
-      }
+      card.append(ticker, isinSmall, pctRow, progWrap, detail);
       grid.appendChild(card);
     });
     container.appendChild(grid);
@@ -98,11 +122,24 @@ export function renderOverlap(container, data) {
 
   // Heatmap
   if (overlap.matrix && overlap.matrix.length > 1) {
-    const hmTitle = document.createElement('div');
-    hmTitle.className = 'card-title';
-    hmTitle.textContent = 'Matrice Overlap (Jaccard pesato)';
-    hmTitle.style.marginTop = '24px';
-    container.appendChild(hmTitle);
+    const hmTitleRow = document.createElement('div');
+    hmTitleRow.style.cssText =
+      'display:flex;align-items:center;gap:6px;' +
+      'margin-top:24px;margin-bottom:10px;';
+    const hmTitleEl = document.createElement('div');
+    hmTitleEl.className = 'card-title';
+    hmTitleEl.style.margin = '0';
+    hmTitleEl.textContent = 'Matrice Overlap (Jaccard pesato)';
+    const jaccardTip = makeInfoIcon(
+      'L\u2019indice di Jaccard pesato misura la % di esposizione ' +
+      'condivisa tra due ETF, pesata per i pesi nel portafoglio. ' +
+      'Diverso dal semplice conteggio di holdings comuni: due ETF ' +
+      'con molte holdings condivise ma di piccolo peso avranno ' +
+      'Jaccard basso.',
+      { dark: false }
+    );
+    hmTitleRow.append(hmTitleEl, jaccardTip);
+    container.appendChild(hmTitleRow);
 
     const legend = document.createElement('div');
     legend.style.cssText =
@@ -141,10 +178,10 @@ export function renderOverlap(container, data) {
   }
 }
 
-function _displayName(ticker) {
-  if (!ticker) return '—';
-  if (ticker.length <= 10) return ticker;
-  return ticker.substring(0, 8) + '…';
+function _displayName(id) {
+  if (!id) return '—';
+  if (id.length <= 6) return id;
+  return id.substring(0, 8) + '…';
 }
 
 function _makeHeader(num, title, desc) {

@@ -1,50 +1,68 @@
 /**
  * Unified tooltip popup utility.
  * Click on the ⓘ icon toggles a small popup with explanation.
- * Click outside or on another icon closes any open popup.
+ * Popup is appended to document.body with position:fixed and
+ * placed via getBoundingClientRect() so it never gets clipped
+ * by parent overflow or pushed off-viewport.
  */
 
-export function makeInfoIcon(text) {
+export function makeInfoIcon(text, opts = {}) {
   const wrap = document.createElement('span');
-  wrap.style.cssText = 'position:relative;display:inline-flex;' +
-    'align-items:center;margin-left:4px;';
+  wrap.style.cssText =
+    'position:relative;display:inline-flex;' +
+    'align-items:center;margin-left:4px;vertical-align:middle;';
 
   const icon = document.createElement('span');
   icon.textContent = 'ⓘ';
-  icon.style.cssText = 'font-size:11px;color:var(--text-t);' +
-    'cursor:pointer;line-height:1;user-select:none;';
+  icon.style.cssText =
+    'font-size:11px;cursor:pointer;line-height:1;' +
+    'user-select:none;' +
+    (opts.dark === false
+      ? 'color:var(--text-t);'
+      : 'color:rgba(255,255,255,0.55);');
 
   const popup = document.createElement('div');
+  popup.setAttribute('data-tooltip-popup', '1');
   popup.style.cssText =
-    'position:absolute;bottom:calc(100% + 6px);left:50%;' +
-    'transform:translateX(-50%);background:#1B2A4A;color:#fff;' +
-    'font-size:11px;line-height:1.5;padding:8px 12px;' +
-    'border-radius:8px;width:220px;z-index:500;' +
-    'box-shadow:0 4px 16px rgba(0,0,0,0.2);' +
-    'pointer-events:none;opacity:0;transition:opacity 0.15s;';
+    'position:fixed;background:#1B2A4A;color:#fff;' +
+    'font-size:12px;font-weight:400;line-height:1.6;' +
+    'text-transform:none;text-align:left;' +
+    'padding:10px 14px;border-radius:8px;width:240px;' +
+    'z-index:9999;pointer-events:none;opacity:0;' +
+    'box-shadow:0 4px 20px rgba(0,0,0,0.25);' +
+    'transition:opacity 0.15s;';
   popup.textContent = text;
+  document.body.appendChild(popup);
 
   icon.addEventListener('click', (e) => {
     e.stopPropagation();
-    const isVisible = popup.style.opacity === '1';
     document.querySelectorAll('[data-tooltip-popup]').forEach(p => {
       p.style.opacity = '0';
       p.style.pointerEvents = 'none';
-      p.removeAttribute('data-tooltip-popup');
     });
-    if (!isVisible) {
-      popup.style.opacity = '1';
-      popup.style.pointerEvents = 'auto';
-      popup.setAttribute('data-tooltip-popup', '1');
+    const rect = icon.getBoundingClientRect();
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceAbove < 140 || spaceBelow > spaceAbove) {
+      popup.style.top = (rect.bottom + 6) + 'px';
+      popup.style.bottom = 'auto';
+    } else {
+      const h = popup.offsetHeight || 130;
+      popup.style.top = (rect.top - 6 - h) + 'px';
+      popup.style.bottom = 'auto';
     }
+    let left = rect.left + rect.width / 2 - 120;
+    left = Math.max(8, Math.min(left, window.innerWidth - 248));
+    popup.style.left = left + 'px';
+    popup.style.opacity = '1';
+    popup.style.pointerEvents = 'auto';
   });
 
   document.addEventListener('click', () => {
     popup.style.opacity = '0';
     popup.style.pointerEvents = 'none';
-    popup.removeAttribute('data-tooltip-popup');
   });
 
-  wrap.append(icon, popup);
+  wrap.appendChild(icon);
   return wrap;
 }

@@ -2,24 +2,44 @@
  * Plotly heatmap wrapper for overlap matrix.
  */
 
+function _abbr(ticker) {
+  if (!ticker) return '—';
+  if (ticker.length <= 6) return ticker;
+  return ticker.substring(0, 6) + '…';
+}
+
 export function renderHeatmap(containerId, matrix, tickers) {
   const el = document.getElementById(containerId);
   if (!el || !matrix || matrix.length === 0) return;
 
+  const shortTickers = tickers.map(_abbr);
+
   // Build text annotations: only the value, color carries the severity
   const textMatrix = matrix.map((row, i) => row.map((val, j) => {
-    if (i === j) return tickers[i];
+    if (i === j) return shortTickers[i];
     return val.toFixed(1) + '%';
   }));
 
+  // customdata preserves the full tickers for the hover tooltip
+  const customdata = matrix.map((row, ri) =>
+    row.map((_, ci) => ({
+      fy: tickers[ri] || '',
+      fx: tickers[ci] || '',
+    }))
+  );
+
   const data = [{
     z: matrix,
-    x: tickers,
-    y: tickers,
+    x: shortTickers,
+    y: shortTickers,
     type: 'heatmap',
     text: textMatrix,
     texttemplate: '%{text}',
-    hoverinfo: 'skip',
+    customdata: customdata,
+    hovertemplate:
+      '<b>%{customdata.fy}</b><br>' +
+      'vs <b>%{customdata.fx}</b><br>' +
+      'Overlap: %{z:.1f}%<extra></extra>',
     colorscale: [
       [0, '#F0FDF4'],
       [0.15, '#FEF3C7'],
@@ -36,9 +56,16 @@ export function renderHeatmap(containerId, matrix, tickers) {
     paper_bgcolor: 'white',
     plot_bgcolor: 'white',
     font: { family: 'DM Sans, sans-serif', size: 12, color: '#111827' },
-    margin: { l: 60, r: 20, t: 20, b: 60 },
-    xaxis: { side: 'bottom', tickangle: 0 },
-    yaxis: { autorange: 'reversed' },
+    margin: { l: 70, r: 20, t: 50, b: 60 },
+    xaxis: {
+      side: 'bottom',
+      tickangle: -35,
+      tickfont: { size: 9, family: 'DM Sans, sans-serif' },
+    },
+    yaxis: {
+      autorange: 'reversed',
+      tickfont: { size: 9, family: 'DM Sans, sans-serif' },
+    },
     height: Math.max(300, tickers.length * 80 + 80),
   };
 

@@ -84,54 +84,96 @@ export function renderFactor(container, data) {
   factors.dimensions.forEach(d => {
     const row = document.createElement('div');
     row.className = 'factor-bar-row';
+    row.style.marginBottom = '24px';
 
     const label = document.createElement('span');
     label.className = 'factor-bar-label';
     label.textContent = d.name;
     const tip = FACTOR_TOOLTIPS[d.name];
-    if (tip) label.appendChild(makeInfoIcon(tip));
+    if (tip) label.appendChild(makeInfoIcon(tip, { dark: false }));
 
-    const barWrap = document.createElement('div');
-    barWrap.className = 'factor-bar-wrap';
+    const track = document.createElement('div');
+    track.style.cssText =
+      'flex:1;position:relative;height:24px;' +
+      'display:flex;align-items:center;margin:0 8px;';
 
-    // Portfolio bar
-    const maxVal = Math.max(d.portfolio_score, d.benchmark_score, 1);
-    const pBar = document.createElement('div');
-    pBar.className = 'factor-bar-fill';
-    pBar.style.background = '#1B2A4A';
-    pBar.style.width = (d.portfolio_score / maxVal * 80).toFixed(1) + '%';
-    pBar.style.position = 'absolute';
-    pBar.style.top = '0';
-    barWrap.style.position = 'relative';
+    const bg = document.createElement('div');
+    bg.style.cssText =
+      'position:absolute;left:0;right:0;height:6px;' +
+      'background:var(--border);border-radius:3px;';
+    track.appendChild(bg);
 
-    // Benchmark bar (thinner, underneath)
-    const bBar = document.createElement('div');
-    bBar.style.cssText = 'position:absolute;top:6px;height:12px;border-radius:4px;background:rgba(13,94,76,0.25);';
-    bBar.style.width = (d.benchmark_score / maxVal * 80).toFixed(1) + '%';
+    if (d.benchmark_score > 0) {
+      const bMark = document.createElement('div');
+      bMark.style.cssText =
+        'position:absolute;width:2px;height:14px;' +
+        'background:#0D5E4C;border-radius:1px;' +
+        'top:50%;transform:translateY(-50%);' +
+        'left:calc(' + d.benchmark_score.toFixed(1) + '% - 1px);';
+      bMark.title = 'Benchmark: ' + d.benchmark_score.toFixed(1);
+      track.appendChild(bMark);
+    }
 
-    barWrap.append(bBar, pBar);
+    const pct = Math.min(Math.max(d.portfolio_score, 0), 100);
+    const pMark = document.createElement('div');
+    pMark.style.cssText =
+      'position:absolute;width:14px;height:14px;' +
+      'background:#1B2A4A;border-radius:50%;' +
+      'border:2px solid white;' +
+      'box-shadow:0 1px 4px rgba(0,0,0,0.2);' +
+      'top:50%;transform:translate(-50%,-50%);' +
+      'left:' + pct.toFixed(1) + '%;';
+    pMark.title = 'Portafoglio: ' + pct.toFixed(1);
+    track.appendChild(pMark);
+
+    const scaleWrap = document.createElement('div');
+    scaleWrap.style.cssText =
+      'position:absolute;left:0;right:0;top:16px;' +
+      'display:flex;justify-content:space-between;';
+    const scaleMin = document.createElement('span');
+    scaleMin.style.cssText = 'font-size:9px;color:var(--text-t);';
+    scaleMin.textContent = d.name === 'Value/Growth' ? 'Value' : '0';
+    const scaleMax = document.createElement('span');
+    scaleMax.style.cssText = 'font-size:9px;color:var(--text-t);';
+    scaleMax.textContent = d.name === 'Value/Growth' ? 'Growth' : '100';
+    scaleWrap.append(scaleMin, scaleMax);
+    track.appendChild(scaleWrap);
 
     const valueEl = document.createElement('span');
     valueEl.className = 'factor-bar-value';
-    valueEl.textContent = d.portfolio_score.toFixed(1);
+    valueEl.style.cssText =
+      'min-width:36px;font-size:13px;font-weight:700;' +
+      'color:var(--text-p);text-align:right;';
+    valueEl.textContent = pct.toFixed(0);
 
-    row.append(label, barWrap, valueEl);
+    row.append(label, track, valueEl);
     barsCard.appendChild(row);
   });
 
-  // Legend
+  // Legend: portfolio dot vs benchmark tick
   const legend = document.createElement('div');
-  legend.style.cssText = 'display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--text-s)';
+  legend.style.cssText =
+    'display:flex;gap:16px;margin-top:20px;' +
+    'font-size:11px;color:var(--text-s);align-items:center;';
+
   const legP = document.createElement('span');
-  legP.style.cssText = 'display:flex;align-items:center;gap:4px';
+  legP.style.cssText = 'display:flex;align-items:center;gap:5px;';
   const dotP = document.createElement('span');
-  dotP.style.cssText = 'width:10px;height:10px;border-radius:2px;background:#1B2A4A';
+  dotP.style.cssText =
+    'width:12px;height:12px;background:#1B2A4A;' +
+    'border-radius:50%;border:2px solid white;' +
+    'box-shadow:0 1px 3px rgba(0,0,0,0.2);' +
+    'display:inline-block;flex-shrink:0;';
   legP.append(dotP, document.createTextNode(' Portafoglio'));
+
   const legB = document.createElement('span');
-  legB.style.cssText = 'display:flex;align-items:center;gap:4px';
-  const dotB = document.createElement('span');
-  dotB.style.cssText = 'width:10px;height:10px;border-radius:2px;background:rgba(13,94,76,0.25)';
-  legB.append(dotB, document.createTextNode(' Benchmark'));
+  legB.style.cssText = 'display:flex;align-items:center;gap:5px;';
+  const tickB = document.createElement('span');
+  tickB.style.cssText =
+    'width:2px;height:14px;background:#0D5E4C;' +
+    'border-radius:1px;display:inline-block;flex-shrink:0;';
+  legB.append(tickB, document.createTextNode(' Benchmark'));
+
   legend.append(legP, legB);
   barsCard.appendChild(legend);
   grid.appendChild(barsCard);

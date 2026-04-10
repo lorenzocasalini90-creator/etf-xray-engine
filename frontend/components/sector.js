@@ -48,14 +48,26 @@ export function renderSector(container, data) {
 
   // Render charts after DOM insertion
   requestAnimationFrame(() => {
-    const sectors = (sector_exposure || []).slice(0, 15);
-    const sLabels = sectors.map(s => s.label).reverse();
-    const sValues = sectors.map(s => s.portfolio_pct).reverse();
+    // Merge "Financials" + "Financial Services" into a single bucket
+    const mergedMap = {};
+    (sector_exposure || []).forEach(s => {
+      const key = (s.label === 'Financial Services' || s.label === 'Financials')
+        ? 'Financials'
+        : s.label;
+      mergedMap[key] = (mergedMap[key] || 0) + s.portfolio_pct;
+    });
+    const sectors = Object.entries(mergedMap)
+      .map(([label, portfolio_pct]) => ({ label, portfolio_pct }))
+      .sort((a, b) => a.portfolio_pct - b.portfolio_pct)
+      .slice(-15);
+
+    const sLabels = sectors.map(s => s.label);
+    const sValues = sectors.map(s => s.portfolio_pct);
     const sColors = sLabels.map(l =>
       l === 'Unknown' ? '#D1D5DB' : '#1B2A4A'
     );
     renderBars('chart-sectors', sLabels, sValues, sColors, {
-      height: Math.max(250, sectors.length * 28),
+      height: Math.max(320, sectors.length * 34),
     });
 
     const countries = (country_exposure || []).slice(0, 10);
@@ -65,7 +77,7 @@ export function renderSector(container, data) {
       l === 'Unknown' ? '#D1D5DB' : '#0D5E4C'
     );
     renderBars('chart-countries', cLabels, cValues, cColors, {
-      height: Math.max(250, countries.length * 28),
+      height: Math.max(280, countries.length * 34),
     });
   });
 }

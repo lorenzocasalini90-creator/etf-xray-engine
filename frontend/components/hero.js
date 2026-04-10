@@ -20,8 +20,8 @@ export function renderHero(container, kpis, fetchMetadata, totalEur) {
   const stats = [
     { label: 'Portafoglio', value: fmtEur(totalEur), cls: '' },
     { label: 'Titoli Unici', value: fmtNum(kpis.unique_securities), cls: '' },
-    { label: 'HHI', value: (kpis.hhi * 10000).toFixed(0),
-      cls: kpis.hhi > 0.15 ? 'coral' : kpis.hhi > 0.05 ? 'amber' : 'green' },
+    { label: 'HHI', value: Number(kpis.hhi).toFixed(4),
+      cls: kpis.hhi > 0.05 ? 'coral' : kpis.hhi > 0.01 ? 'amber' : 'green' },
     { label: 'Effective N', value: kpis.effective_n.toFixed(0), cls: '' },
     { label: 'Active Share', value: fmtPct(kpis.active_share),
       cls: kpis.active_share < 20 ? 'coral' : kpis.active_share > 60 ? 'green' : 'amber' },
@@ -48,12 +48,16 @@ export function renderHero(container, kpis, fetchMetadata, totalEur) {
   const editBtn = document.createElement('button');
   editBtn.className = 'hero-edit';
   editBtn.textContent = '\u270F Modifica';
+  editBtn.style.opacity = '0.6';
+  editBtn.style.fontSize = '11px';
   editBtn.addEventListener('click', () => {
     document.getElementById('report').hidden = true;
     document.getElementById('portfolio-input').hidden = false;
     document.getElementById('topbar-nav').hidden = true;
     document.getElementById('topbar-chip').hidden = true;
     document.getElementById('topbar-pdf').hidden = true;
+    const modBtn = document.getElementById('topbar-mod');
+    if (modBtn) modBtn.hidden = true;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
   container.appendChild(editBtn);
