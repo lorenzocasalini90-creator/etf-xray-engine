@@ -24,6 +24,11 @@ export function renderPortfolioForm(container, onAnalyze) {
   _onAnalyze = onAnalyze;
   const saved = localStorage.getItem('cmf_portfolio');
   if (saved) { try { _positions = JSON.parse(saved); } catch(e) { _positions = []; } }
+  _positions = _positions.filter(p =>
+    p && p.ticker && typeof p.ticker === 'string' &&
+    p.ticker.length >= 2 && p.ticker.charCodeAt(0) >= 32 &&
+    typeof p.capital === 'number' && p.capital > 0
+  );
   _render();
 }
 
@@ -285,22 +290,51 @@ function _submit() {
 function _onFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (evt) => {
-    const lines = evt.target.result.split('\n').filter(l => l.trim());
-    for (let i = 1; i < lines.length && _positions.length < 10; i++) {
-      const parts = lines[i].split(/[,;\t]/);
-      if (parts.length >= 2) {
-        const ticker = parts[0].trim().toUpperCase();
-        const amount = parseFloat(parts[1].replace(/[^\d.]/g, ''));
-        if (ticker && !isNaN(amount) && amount > 0 && !_positions.some(p => p.ticker === ticker)) {
-          _positions.push({ ticker, capital: amount, name: '' });
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        for (let i = 1; i < rows.length && _positions.length < 10; i++) {
+          const ticker = String(rows[i][0] || '').trim().toUpperCase();
+          const raw = String(rows[i][1] || '').replace(/[^\d.]/g, '');
+          const amount = parseFloat(raw);
+          if (ticker && ticker.length >= 2 &&
+              !isNaN(amount) && amount > 0 &&
+              !_positions.some(p => p.ticker === ticker)) {
+            _positions.push({ ticker, capital: amount, name: '' });
+          }
+        }
+      } catch (err) {
+        console.error('XLSX parse error:', err);
+      }
+      _render();
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const lines = evt.target.result.split('\n').filter(l => l.trim());
+      for (let i = 1; i < lines.length && _positions.length < 10; i++) {
+        const parts = lines[i].split(/[,;\t]/);
+        if (parts.length >= 2) {
+          const ticker = parts[0].trim().toUpperCase();
+          const amount = parseFloat(parts[1].replace(/[^\d.]/g, ''));
+          if (ticker && !isNaN(amount) && amount > 0 && !_positions.some(p => p.ticker === ticker)) {
+            _positions.push({ ticker, capital: amount, name: '' });
+          }
         }
       }
-    }
-    _render();
-  };
-  reader.readAsText(file, 'UTF-8');
+      _render();
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  e.target.value = '';
 }
 
 function _onJsonLoad(e) {

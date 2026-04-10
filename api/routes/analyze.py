@@ -72,17 +72,31 @@ def _fetch_all(
             ticker = futures[future]
             try:
                 _, result = future.result()
+                n_rows = 0 if result.holdings is None else len(result.holdings)
+                logger.info(
+                    "fetch[%s] status=%s source=%s rows=%d coverage=%.1f",
+                    ticker, result.status, result.source, n_rows, result.coverage_pct,
+                )
                 if result.status in ("success", "cached", "partial"):
                     if result.holdings is not None and not result.holdings.empty:
                         holdings_db[ticker] = result.holdings
                         sources.append(f"{ticker}:{result.source}")
                     else:
-                        warnings.append(f"{ticker}: empty holdings from {result.source}")
+                        warnings.append(
+                            f"{ticker}: nessuna holding disponibile (source={result.source})"
+                        )
                 else:
                     warnings.append(f"{ticker}: {result.message}")
             except Exception as exc:
                 logger.error("Fetch failed for %s: %s", ticker, exc)
                 warnings.append(f"{ticker}: fetch error — {exc}")
+
+    requested = [p["ticker"] for p in positions]
+    missing = [t for t in requested if t not in holdings_db]
+    logger.info(
+        "fetch_all summary: requested=%s in_db=%s missing=%s",
+        requested, list(holdings_db.keys()), missing,
+    )
 
     return holdings_db, sources, warnings
 
@@ -99,7 +113,9 @@ def _build_overlap(
             pairs=[],
         )
 
+    logger.info("overlap input ETFs: %s", list(holdings_db.keys()))
     mat = overlap_matrix(holdings_db)
+    logger.info("overlap matrix tickers: %s shape=%s", mat.columns.tolist(), mat.shape)
     matrix_list = mat.values.tolist()
 
     pairs = []
