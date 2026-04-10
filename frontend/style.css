@@ -659,11 +659,15 @@ input, select { font-family: inherit; }
 .red-card.verdict-yellow { border-top: 3px solid var(--amber); }
 .red-card.verdict-red    { border-top: 3px solid var(--coral); }
 .red-ticker {
-  font-family: 'DM Mono', monospace, 'DM Sans';
+  font-family: 'DM Sans', sans-serif;
   font-weight: 700;
   color: var(--navy);
-  font-size: 14px;
-  margin-bottom: 8px;
+  font-size: 13px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .red-pct {
   font-size: 28px;
@@ -677,6 +681,9 @@ input, select { font-family: inherit; }
   font-size: 11px;
   color: var(--text-s);
   margin-top: 10px;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 /* ── Alert banners ────────────────────────────────── */

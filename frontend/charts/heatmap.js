@@ -8,18 +8,25 @@ function _abbr(ticker) {
   return ticker.substring(0, 6) + '…';
 }
 
+function _label(ticker, nameMap) {
+  if (nameMap && nameMap[ticker]) {
+    const n = nameMap[ticker];
+    // "iShares Core MSCI World UCITS ETF USD Acc" → "iShares Core MSCI World"
+    // Strip boilerplate tails starting at UCITS/ETF/USD/EUR/Acc/Inc/…
+    const clean = n
+      .replace(/\s+(UCITS|ETF|USD|EUR|GBP|Acc|Inc|Distributing|Accumulating)\b.*/gi, '')
+      .trim();
+    const pick = clean || n;
+    return pick.length > 16 ? pick.substring(0, 15) + '…' : pick;
+  }
+  return _abbr(ticker);
+}
+
 export function renderHeatmap(containerId, matrix, tickers, nameMap = {}) {
   const el = document.getElementById(containerId);
   if (!el || !matrix || matrix.length === 0) return;
 
-  function _label(ticker) {
-    if (nameMap[ticker]) {
-      const n = nameMap[ticker];
-      return n.length > 12 ? n.substring(0, 11) + '…' : n;
-    }
-    return _abbr(ticker);
-  }
-  const shortTickers = tickers.map(_label);
+  const shortTickers = tickers.map(t => _label(t, nameMap));
 
   // Build text annotations: only the value, color carries the severity
   const textMatrix = matrix.map((row, i) => row.map((val, j) => {

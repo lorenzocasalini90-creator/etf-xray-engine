@@ -76,7 +76,9 @@ export function renderOverlap(container, data) {
       const ticker = document.createElement('div');
       ticker.className = 'red-ticker';
       ticker.textContent = _displayName(r.etf_ticker, nameMap);
-      ticker.title = r.etf_ticker;
+      ticker.title = nameMap[r.etf_ticker]
+        ? nameMap[r.etf_ticker] + ' (' + r.etf_ticker + ')'
+        : r.etf_ticker;
 
       const isinSmall = document.createElement('div');
       isinSmall.style.cssText =
@@ -181,11 +183,13 @@ export function renderOverlap(container, data) {
 
 function _displayName(id, nameMap = {}) {
   if (!id) return '—';
-  if (nameMap[id]) {
-    const name = nameMap[id];
-    return name.length > 20 ? name.substring(0, 19) + '…' : name;
-  }
+  // Name available from the API: return the full string, let CSS
+  // (ellipsis on .red-ticker) or line-wrap on .red-detail handle
+  // the visual truncation.
+  if (nameMap[id]) return nameMap[id];
+  // Short tickers (SWDA, CSPX, VWCE…) are already readable.
   if (id.length <= 6) return id;
+  // Long ISIN without a known name: abbreviate.
   return id.substring(0, 8) + '…';
 }
 

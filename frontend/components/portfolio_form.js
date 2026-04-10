@@ -129,7 +129,7 @@ function _render() {
       name.textContent = p.name || '';
       const amount = document.createElement('span');
       amount.className = 'etf-amount';
-      amount.textContent = fmtEur(Number(p.capital));
+      amount.textContent = fmtEur(Number(p.capital) || 0);
       const removeBtn = document.createElement('button');
       removeBtn.className = 'etf-remove';
       removeBtn.textContent = '\u00D7';
@@ -335,12 +335,13 @@ function _onFileUpload(e) {
           if (ticker && ticker.length >= 2 &&
               !isNaN(amount) && amount > 0 &&
               !_positions.some(p => p.ticker === ticker)) {
-            _positions.push({ ticker, capital: Number(amount), name: '' });
+            _positions.push({ ticker, capital: Number(amount) || 0, name: '' });
           }
         }
       } catch (err) {
         console.error('XLSX parse error:', err);
       }
+      _positions = _positions.map(p => ({ ...p, capital: Number(p.capital) || 0 }));
       _render();
     };
     reader.readAsArrayBuffer(file);
@@ -354,10 +355,11 @@ function _onFileUpload(e) {
           const ticker = parts[0].trim().toUpperCase();
           const amount = parseFloat(parts[1].replace(/[^\d.]/g, ''));
           if (ticker && !isNaN(amount) && amount > 0 && !_positions.some(p => p.ticker === ticker)) {
-            _positions.push({ ticker, capital: Number(amount), name: '' });
+            _positions.push({ ticker, capital: Number(amount) || 0, name: '' });
           }
         }
       }
+      _positions = _positions.map(p => ({ ...p, capital: Number(p.capital) || 0 }));
       _render();
     };
     reader.readAsText(file, 'UTF-8');
@@ -397,6 +399,7 @@ function _onJsonLoad(e) {
           capital: Number(p.capital ?? p.amount_eur ?? 0) || 0,
           name: p.name || '',
         }));
+      _positions = _positions.map(p => ({ ...p, capital: Number(p.capital) || 0 }));
       _render();
       if (_positions.length > 0) {
         flashBtn('\u2713 Caricato');
