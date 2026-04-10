@@ -27,6 +27,7 @@ class HoldingRow(BaseModel):
 
 class RedundancyItem(BaseModel):
     etf_ticker: str
+    etf_name: Optional[str] = None
     redundancy_pct: float
     ter_waste_eur: float
     covered_by: List[Dict[str, float]]
@@ -42,6 +43,7 @@ class OverlapPair(BaseModel):
 class OverlapResult(BaseModel):
     matrix: List[List[float]]
     tickers: List[str]
+    ticker_names: Dict[str, str] = {}
     pairs: List[OverlapPair]
 
 

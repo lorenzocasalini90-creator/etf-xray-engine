@@ -8,11 +8,18 @@ function _abbr(ticker) {
   return ticker.substring(0, 6) + '…';
 }
 
-export function renderHeatmap(containerId, matrix, tickers) {
+export function renderHeatmap(containerId, matrix, tickers, nameMap = {}) {
   const el = document.getElementById(containerId);
   if (!el || !matrix || matrix.length === 0) return;
 
-  const shortTickers = tickers.map(_abbr);
+  function _label(ticker) {
+    if (nameMap[ticker]) {
+      const n = nameMap[ticker];
+      return n.length > 12 ? n.substring(0, 11) + '…' : n;
+    }
+    return _abbr(ticker);
+  }
+  const shortTickers = tickers.map(_label);
 
   // Build text annotations: only the value, color carries the severity
   const textMatrix = matrix.map((row, i) => row.map((val, j) => {

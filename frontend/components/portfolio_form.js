@@ -19,6 +19,7 @@ let _onAnalyze = null;
 let _container = null;
 let _debounceTimer = null;
 let _jsonInput = null;
+let _btnLoadRef = null;
 
 export function renderPortfolioForm(container, onAnalyze) {
   _container = container;
@@ -239,7 +240,16 @@ function _render() {
     btnSave.textContent = '\u2713 Salvato';
     setTimeout(() => { btnSave.textContent = '\uD83D\uDCBE Salva'; }, 1500);
   });
-  btnLoad.addEventListener('click', () => _jsonInput && _jsonInput.click());
+  btnLoad.addEventListener('click', () => {
+    if (_jsonInput) {
+      _jsonInput.value = '';
+      _jsonInput.click();
+    }
+  });
+  // Feedback target for _onJsonLoad — exposed via closure through
+  // a module-scoped setter so the listener (module-level) can update
+  // the currently rendered button.
+  _btnLoadRef = btnLoad;
   fileInput.addEventListener('change', _onFileUpload);
 
   // Close autocomplete on outside click
@@ -357,23 +367,45 @@ function _onFileUpload(e) {
 }
 
 function _onJsonLoad(e) {
+  console.log('[CMF] _onJsonLoad called, file:', e.target.files[0]?.name);
   const file = e.target.files[0];
   if (!file) return;
+
+  const flashBtn = (msg, delay = 1500) => {
+    if (_btnLoadRef) {
+      const original = '\uD83D\uDCC2 Carica';
+      _btnLoadRef.textContent = msg;
+      setTimeout(() => { _btnLoadRef.textContent = original; }, delay);
+    }
+  };
+
   const reader = new FileReader();
   reader.onload = (evt) => {
     try {
       const data = JSON.parse(evt.target.result);
       // Accept both array format [{ticker, capital}] and wrapped {positions: [...]}
       const arr = Array.isArray(data) ? data : (data.positions || []);
-      if (!Array.isArray(arr) || arr.length === 0) return;
-      _positions = arr.filter(p => p.ticker && Number(p.capital) > 0).slice(0, 10).map(p => ({
-        ticker: String(p.ticker).trim().toUpperCase(),
-        capital: Number(p.capital) || 0,
-        name: p.name || '',
-      }));
+      if (!Array.isArray(arr) || arr.length === 0) {
+        flashBtn('\u2717 Formato non valido', 2000);
+        return;
+      }
+      _positions = arr
+        .filter(p => p.ticker && Number(p.capital ?? p.amount_eur ?? 0) > 0)
+        .slice(0, 10)
+        .map(p => ({
+          ticker: String(p.ticker).trim().toUpperCase(),
+          capital: Number(p.capital ?? p.amount_eur ?? 0) || 0,
+          name: p.name || '',
+        }));
       _render();
+      if (_positions.length > 0) {
+        flashBtn('\u2713 Caricato');
+      } else {
+        flashBtn('\u2717 Formato non valido', 2000);
+      }
     } catch (err) {
-      /* ignore malformed JSON */
+      console.error('[CMF] JSON parse error:', err);
+      flashBtn('\u2717 Formato non valido', 2000);
     }
   };
   reader.readAsText(file, 'UTF-8');

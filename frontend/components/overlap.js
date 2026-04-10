@@ -7,6 +7,7 @@ import { makeInfoIcon } from './tooltip.js';
 
 export function renderOverlap(container, data) {
   const { redundancy, overlap, insights } = data;
+  const nameMap = (overlap && overlap.ticker_names) || {};
   container.textContent = '';
   container.classList.add('fade-in');
 
@@ -74,7 +75,7 @@ export function renderOverlap(container, data) {
 
       const ticker = document.createElement('div');
       ticker.className = 'red-ticker';
-      ticker.textContent = _displayName(r.etf_ticker);
+      ticker.textContent = _displayName(r.etf_ticker, nameMap);
       ticker.title = r.etf_ticker;
 
       const isinSmall = document.createElement('div');
@@ -108,7 +109,7 @@ export function renderOverlap(container, data) {
       detail.className = 'red-detail';
       const coveredBy = r.covered_by.map(obj => {
         return Object.entries(obj)
-          .map(([k, v]) => _displayName(sanitize(k)) + ' ' + fmtPct(v))
+          .map(([k, v]) => _displayName(sanitize(k), nameMap) + ' ' + fmtPct(v))
           .join(', ');
       }).join(', ');
       detail.textContent = (coveredBy ? 'Coperto da: ' + coveredBy : '') +
@@ -173,13 +174,17 @@ export function renderOverlap(container, data) {
     container.appendChild(hmCard);
 
     requestAnimationFrame(() => {
-      renderHeatmap('heatmap-container', overlap.matrix, overlap.tickers);
+      renderHeatmap('heatmap-container', overlap.matrix, overlap.tickers, nameMap);
     });
   }
 }
 
-function _displayName(id) {
+function _displayName(id, nameMap = {}) {
   if (!id) return '—';
+  if (nameMap[id]) {
+    const name = nameMap[id];
+    return name.length > 20 ? name.substring(0, 19) + '…' : name;
+  }
   if (id.length <= 6) return id;
   return id.substring(0, 8) + '…';
 }

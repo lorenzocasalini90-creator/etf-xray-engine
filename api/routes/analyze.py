@@ -101,6 +101,46 @@ def _fetch_all(
     return holdings_db, sources, warnings
 
 
+def _get_etf_name(
+    identifier: str,
+    holdings_db: dict[str, pd.DataFrame],
+) -> str | None:
+    """Recupera il nome ETF.
+
+    Priorità:
+    1. Colonne del DataFrame holdings (etf_name/fund_name/name) —
+       best-effort: HOLDINGS_SCHEMA le droppa ma alcuni fetcher
+       potrebbero aggiungerle prima della validate_output.
+    2. ETF directory CSV caricato da etf_search._load_directory,
+       lookup per ticker o ISIN.
+    """
+    df = holdings_db.get(identifier)
+    if df is not None and not df.empty:
+        for col in ("etf_name", "fund_name", "name"):
+            if col in df.columns:
+                val = df[col].iloc[0]
+                if pd.notna(val) and str(val).strip():
+                    return _clean_str(val)
+
+    try:
+        from api.routes.etf_search import _load_directory
+        directory = _load_directory()
+        if directory is None or directory.empty:
+            return None
+        ident_upper = identifier.strip().upper()
+        hit = directory[directory["ticker"].str.upper() == ident_upper]
+        if hit.empty:
+            hit = directory[directory["isin"].str.upper() == ident_upper]
+        if not hit.empty:
+            name = hit.iloc[0].get("name", "")
+            if name and str(name).strip():
+                return _clean_str(name)
+    except Exception as exc:
+        logger.debug("ETF directory lookup failed for %s: %s", identifier, exc)
+
+    return None
+
+
 def _build_overlap(
     holdings_db: dict[str, pd.DataFrame],
 ) -> OverlapResult:
@@ -110,6 +150,7 @@ def _build_overlap(
         return OverlapResult(
             matrix=[[100.0]] if tickers else [],
             tickers=tickers,
+            ticker_names={t: (_get_etf_name(t, holdings_db) or "") for t in tickers if _get_etf_name(t, holdings_db)},
             pairs=[],
         )
 
@@ -129,7 +170,18 @@ def _build_overlap(
                 common_holdings_count=0,  # not tracked by overlap_matrix
             ))
 
-    return OverlapResult(matrix=matrix_list, tickers=labels, pairs=pairs)
+    ticker_names: dict[str, str] = {}
+    for t in labels:
+        name = _get_etf_name(t, holdings_db)
+        if name:
+            ticker_names[t] = name
+
+    return OverlapResult(
+        matrix=matrix_list,
+        tickers=labels,
+        ticker_names=ticker_names,
+        pairs=pairs,
+    )
 
 
 def _build_redundancy(
@@ -145,6 +197,7 @@ def _build_redundancy(
         covered_by = [{k: v} for k, v in breakdown.items()]
         items.append(RedundancyItem(
             etf_ticker=ticker,
+            etf_name=_get_etf_name(ticker, holdings_db),
             redundancy_pct=round(row["redundancy_pct"], 2),
             ter_waste_eur=round(row["ter_wasted"], 2),
             covered_by=covered_by,
