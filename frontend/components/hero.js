@@ -2,6 +2,17 @@
  * Hero bar — navy strip with KPI stats.
  */
 import { fmtEur, fmtPct, fmtNum } from './sanitize.js';
+import { makeInfoIcon } from './tooltip.js';
+
+const HERO_TOOLTIPS = {
+  Copertura:
+    'Percentuale del portafoglio per cui abbiamo dati ' +
+    'completi di holdings dagli emittenti ETF.',
+  'Effective N':
+    'Numero equivalente di titoli equi-pesati. ' +
+    'Un portafoglio da 130 titoli con Eff. N=71 ha una ' +
+    'diversificazione reale pari a 71 titoli identici.',
+};
 
 export function renderHero(container, kpis, fetchMetadata, totalEur) {
   container.textContent = '';
@@ -25,6 +36,8 @@ export function renderHero(container, kpis, fetchMetadata, totalEur) {
     const lbl = document.createElement('span');
     lbl.className = 'hero-label';
     lbl.textContent = s.label;
+    const tip = HERO_TOOLTIPS[s.label];
+    if (tip) lbl.appendChild(makeInfoIcon(tip));
     const val = document.createElement('span');
     val.className = 'hero-value' + (s.cls ? ' ' + s.cls : '');
     val.textContent = s.value;

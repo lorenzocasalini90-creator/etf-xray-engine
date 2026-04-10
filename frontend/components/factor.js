@@ -2,6 +2,22 @@
  * Factor Fingerprint section — tilt badges, factor bars, coverage.
  * Uses DOM API for safe rendering.
  */
+import { makeInfoIcon } from './tooltip.js';
+
+const FACTOR_TOOLTIPS = {
+  'Value/Growth':
+    'Punteggio basso = orientato al Value (titoli economici ' +
+    'rispetto agli utili). Punteggio alto = orientato al Growth ' +
+    '(aziende in forte crescita).',
+  'Quality':
+    'Misura la solidità finanziaria media dei titoli: ROE, debito, ' +
+    'stabilità degli utili.',
+  'Size':
+    'Capitalizzazione media dei titoli. Vicino a 0 = molte small ' +
+    'cap. Vicino a 100 = prevalenza di large cap.',
+  'Dividend Yield':
+    'Rendimento da dividendi medio ponderato del portafoglio.',
+};
 
 export function renderFactor(container, data) {
   const { factors } = data;
@@ -12,6 +28,19 @@ export function renderFactor(container, data) {
   const header = _makeHeader('4', 'Factor Fingerprint',
     'Profilo fattoriale del portafoglio');
   container.appendChild(header);
+
+  const intro = document.createElement('p');
+  intro.style.cssText =
+    'font-size:12px;color:var(--text-s);margin-bottom:16px;' +
+    'line-height:1.6;max-width:700px;';
+  intro.textContent =
+    'Il profilo fattoriale descrive le caratteristiche dei titoli ' +
+    'nel tuo portafoglio. Value/Growth misura se i titoli tendono ' +
+    'ad essere "a buon prezzo" (Value) o ad alta crescita (Growth). ' +
+    'Size misura la capitalizzazione media: Small Cap = aziende ' +
+    'piccole, Large Cap = grandi. Quality misura solidità dei bilanci. ' +
+    'I punteggi vanno da 0 a 100 — 50 è neutro.';
+  container.appendChild(intro);
 
   if (!factors || !factors.dimensions || factors.dimensions.length === 0) {
     const noData = document.createElement('p');
@@ -59,6 +88,8 @@ export function renderFactor(container, data) {
     const label = document.createElement('span');
     label.className = 'factor-bar-label';
     label.textContent = d.name;
+    const tip = FACTOR_TOOLTIPS[d.name];
+    if (tip) label.appendChild(makeInfoIcon(tip));
 
     const barWrap = document.createElement('div');
     barWrap.className = 'factor-bar-wrap';

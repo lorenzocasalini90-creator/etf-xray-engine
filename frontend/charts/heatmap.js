@@ -6,16 +6,10 @@ export function renderHeatmap(containerId, matrix, tickers) {
   const el = document.getElementById(containerId);
   if (!el || !matrix || matrix.length === 0) return;
 
-  // Build text annotations
+  // Build text annotations: only the value, color carries the severity
   const textMatrix = matrix.map((row, i) => row.map((val, j) => {
     if (i === j) return tickers[i];
-    const v = val.toFixed(1);
-    let label = '';
-    if (val < 15) label = 'MIN';
-    else if (val < 35) label = 'BASSA';
-    else if (val < 50) label = 'ALTA';
-    else label = 'CRITICA';
-    return v + '%\n' + label;
+    return val.toFixed(1) + '%';
   }));
 
   const data = [{

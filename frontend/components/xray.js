@@ -2,9 +2,27 @@
  * X-Ray section — holdings table + active bets + KPI cards.
  */
 import { sanitize, fmtEur, fmtPct, fmtNum } from './sanitize.js';
+import { makeInfoIcon } from './tooltip.js';
+
+const TOOLTIPS = {
+  'Titoli unici':
+    'Numero totale di titoli distinti nel portafoglio aggregato, ' +
+    'eliminando i duplicati tra ETF.',
+  'Active Share':
+    'Quanto il tuo portafoglio differisce dal benchmark. ' +
+    '0% = identico al benchmark. 100% = completamente diverso.',
+  'HHI (concentrazione)':
+    'Indice di concentrazione Herfindahl-Hirschman. ' +
+    'Sotto 0.01 = molto diversificato. Sopra 0.05 = concentrato. ' +
+    'Più è basso, meglio è distribuito il rischio.',
+  'TER inefficienza':
+    'Costo annuo stimato delle commissioni duplicate: ' +
+    'holdings presenti in più ETF che paghi più volte.',
+};
 
 export function renderXRay(container, data) {
   const { holdings, active_bets, insights, kpis } = data;
+  const benchLabel = data.benchmark_label || 'benchmark';
   container.textContent = '';
   container.classList.add('fade-in');
 
@@ -33,10 +51,13 @@ export function renderXRay(container, data) {
   const asValue = kpis.active_share < 1
     ? 'Identico al benchmark'
     : fmtPct(kpis.active_share);
+  const hhiClass = kpis.hhi > 0.05 ? 'kpi-coral'
+                 : kpis.hhi > 0.01 ? 'kpi-amber'
+                 : 'kpi-green';
   const kpiData = [
     { label: 'Titoli unici', value: fmtNum(kpis.unique_securities), cls: '' },
     { label: 'Active Share', value: asValue, cls: asClass },
-    { label: 'HHI (concentrazione)', value: (kpis.hhi * 10000).toFixed(0), cls: '' },
+    { label: 'HHI (concentrazione)', value: Number(kpis.hhi).toFixed(4), cls: hhiClass },
     { label: 'TER inefficienza', value: fmtEur(terWaste) + '/anno', cls: 'kpi-coral' },
   ];
   const kpiGrid = document.createElement('div');
@@ -47,6 +68,8 @@ export function renderXRay(container, data) {
     const lbl = document.createElement('div');
     lbl.className = 'kpi-label';
     lbl.textContent = k.label;
+    const info = TOOLTIPS[k.label];
+    if (info) lbl.appendChild(makeInfoIcon(info));
     const val = document.createElement('div');
     val.className = 'kpi-value' + (k.cls ? ' ' + k.cls : '');
     val.textContent = k.value;
@@ -71,7 +94,7 @@ export function renderXRay(container, data) {
   table.className = 'data-table';
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
-  ['#', 'Titolo', 'Peso', 'Valore', 'Settore'].forEach(h => {
+  ['#', 'Titolo', 'Peso', '', 'Valore', 'Settore'].forEach(h => {
     const th = document.createElement('th');
     th.textContent = h;
     if (['Peso', 'Valore', '#'].includes(h)) th.className = 'num';
@@ -115,8 +138,17 @@ export function renderXRay(container, data) {
   betsCard.className = 'card';
   const betsTitle = document.createElement('div');
   betsTitle.className = 'card-title';
-  betsTitle.textContent = 'Active Bets vs Benchmark';
+  betsTitle.textContent = 'Active Bets vs ' + benchLabel;
   betsCard.appendChild(betsTitle);
+
+  const betsExpl = document.createElement('p');
+  betsExpl.style.cssText =
+    'font-size:11px;color:var(--text-t);margin-bottom:12px;line-height:1.5;';
+  betsExpl.textContent =
+    'Titoli in cui sei più (sovrappeso) o meno (sottopeso) ' +
+    'esposto rispetto al ' + benchLabel + '. ' +
+    '+X pp = hai X punti percentuale in più rispetto al benchmark.';
+  betsCard.appendChild(betsExpl);
 
   if (active_bets.overweight.length === 0 && active_bets.underweight.length === 0) {
     const noData = document.createElement('p');
@@ -180,13 +212,16 @@ function _makeHoldingRow(h, maxWeight) {
   const tdWeight = document.createElement('td');
   tdWeight.className = 'num';
   tdWeight.textContent = fmtPct(h.weight_pct);
+
+  const tdBar = document.createElement('td');
+  tdBar.style.width = '60px';
   const bar = document.createElement('span');
   bar.className = 'mini-bar-wrap';
   const fill = document.createElement('span');
   fill.className = 'mini-bar-fill';
   fill.style.width = (h.weight_pct / maxWeight * 100).toFixed(0) + '%';
   bar.appendChild(fill);
-  tdWeight.appendChild(bar);
+  tdBar.appendChild(bar);
 
   const tdVal = document.createElement('td');
   tdVal.className = 'num';
@@ -200,7 +235,7 @@ function _makeHoldingRow(h, maxWeight) {
   tdSector.style.textOverflow = 'ellipsis';
   tdSector.style.whiteSpace = 'nowrap';
 
-  tr.append(tdRank, tdTitle, tdWeight, tdVal, tdSector);
+  tr.append(tdRank, tdTitle, tdWeight, tdBar, tdVal, tdSector);
   return tr;
 }
 
@@ -212,8 +247,8 @@ function _makeBetRow(bet, isOver) {
   name.textContent = sanitize(bet.name) || bet.ticker;
   const delta = document.createElement('span');
   delta.className = 'bet-delta ' + (isOver ? 'pos' : 'neg');
-  const sign = bet.delta_pct >= 0 ? '+' : '';
-  delta.textContent = sign + fmtPct(bet.delta_pct * 100);
+  const rounded = Math.round(Math.abs(bet.delta_pct * 100));
+  delta.textContent = (isOver ? '+' : '−') + rounded + ' pp';
   row.append(name, delta);
   return row;
 }

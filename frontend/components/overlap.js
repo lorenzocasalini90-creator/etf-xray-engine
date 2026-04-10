@@ -59,7 +59,8 @@ export function renderOverlap(container, data) {
 
       const ticker = document.createElement('div');
       ticker.className = 'red-ticker';
-      ticker.textContent = sanitize(r.etf_ticker);
+      ticker.textContent = _displayName(r.etf_ticker);
+      ticker.title = r.etf_ticker;
 
       const pct = document.createElement('div');
       pct.className = 'red-pct ' + pctClass;
@@ -82,6 +83,14 @@ export function renderOverlap(container, data) {
         (r.ter_waste_eur > 0 ? ' \u00B7 TER sprecato: ' + fmtEur(r.ter_waste_eur) : '');
 
       card.append(ticker, pct, progWrap, detail);
+      if (r.etf_name) {
+        const nameSmall = document.createElement('div');
+        nameSmall.style.cssText =
+          'font-size:10px;color:var(--text-t);margin-bottom:6px;' +
+          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+        nameSmall.textContent = sanitize(r.etf_name);
+        card.insertBefore(nameSmall, pct);
+      }
       grid.appendChild(card);
     });
     container.appendChild(grid);
@@ -95,6 +104,29 @@ export function renderOverlap(container, data) {
     hmTitle.style.marginTop = '24px';
     container.appendChild(hmTitle);
 
+    const legend = document.createElement('div');
+    legend.style.cssText =
+      'display:flex;gap:12px;align-items:center;' +
+      'margin-bottom:10px;flex-wrap:wrap;';
+    const items = [
+      { color: '#F0FDF4', border: '#BBF7D0', label: 'Minima (<15%)' },
+      { color: '#FEF3C7', border: '#FDE68A', label: 'Bassa (15-35%)' },
+      { color: '#FEE2E2', border: '#FECACA', label: 'Alta (35-50%)' },
+      { color: '#FF6B6B', border: '#FF6B6B', label: 'Critica (>50%)' },
+    ];
+    items.forEach(item => {
+      const el = document.createElement('span');
+      el.style.cssText = 'display:flex;align-items:center;gap:5px;' +
+        'font-size:11px;color:var(--text-s);';
+      const dot = document.createElement('span');
+      dot.style.cssText =
+        'width:12px;height:12px;border-radius:3px;flex-shrink:0;' +
+        'background:' + item.color + ';border:1px solid ' + item.border + ';';
+      el.append(dot, document.createTextNode(item.label));
+      legend.appendChild(el);
+    });
+    container.appendChild(legend);
+
     const hmCard = document.createElement('div');
     hmCard.className = 'card';
     const hmContainer = document.createElement('div');
@@ -107,6 +139,12 @@ export function renderOverlap(container, data) {
       renderHeatmap('heatmap-container', overlap.matrix, overlap.tickers);
     });
   }
+}
+
+function _displayName(ticker) {
+  if (!ticker) return '—';
+  if (ticker.length <= 10) return ticker;
+  return ticker.substring(0, 8) + '…';
 }
 
 function _makeHeader(num, title, desc) {

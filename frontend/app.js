@@ -42,17 +42,44 @@ async function onAnalyze(positions, benchmark) {
     if (step && loadingMsg) loadingMsg.textContent = step.msg;
   }, 1000);
 
+  async function _fetchWithRetry(body, maxRetries = 1) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.status === 504 && attempt < maxRetries) {
+          if (loadingMsg) {
+            loadingMsg.textContent =
+              'Prima analisi completata in background. Carico i risultati...';
+          }
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+        return res;
+      } catch (err) {
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
   try {
     const body = { positions };
     if (benchmark) body.benchmark = benchmark;
 
-    const res = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const res = await _fetchWithRetry(body);
 
     if (!res.ok) {
+      if (res.status === 504) {
+        throw new Error('Analisi non riuscita. Il server ha impiegato troppo tempo. ' +
+          'Riprova tra qualche secondo — la prossima analisi sarà più veloce.');
+      }
       const err = await res.json().catch(() => ({ detail: 'Errore sconosciuto' }));
       throw new Error(err.detail || 'Errore ' + res.status);
     }
@@ -66,12 +93,21 @@ async function onAnalyze(positions, benchmark) {
 
     renderHero(document.getElementById('hero-bar'), data.kpis, data.fetch_metadata, totalEur);
 
+    const BENCH_LABELS = {
+      MSCI_WORLD: 'MSCI World',
+      SP500: 'S&P 500',
+      MSCI_EM: 'MSCI EM',
+      FTSE_ALL_WORLD: 'FTSE All-World',
+    };
+    const benchmarkLabel = benchmark ? (BENCH_LABELS[benchmark] || benchmark) : 'benchmark';
+
     renderXRay(document.getElementById('s-xray'), {
       holdings: data.holdings,
       active_bets: data.active_bets,
       insights: data.insights,
       kpis: data.kpis,
       redundancy: data.redundancy,
+      benchmark_label: benchmarkLabel,
     });
 
     renderOverlap(document.getElementById('s-overlap'), {

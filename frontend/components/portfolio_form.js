@@ -18,17 +18,28 @@ let _positions = [];
 let _onAnalyze = null;
 let _container = null;
 let _debounceTimer = null;
+let _jsonInput = null;
 
 export function renderPortfolioForm(container, onAnalyze) {
   _container = container;
   _onAnalyze = onAnalyze;
+
+  if (!_jsonInput) {
+    _jsonInput = document.createElement('input');
+    _jsonInput.type = 'file';
+    _jsonInput.accept = '.json';
+    _jsonInput.hidden = true;
+    _jsonInput.addEventListener('change', _onJsonLoad);
+    document.body.appendChild(_jsonInput);
+  }
+
   const saved = localStorage.getItem('cmf_portfolio');
   if (saved) { try { _positions = JSON.parse(saved); } catch(e) { _positions = []; } }
   _positions = _positions.filter(p =>
     p && p.ticker && typeof p.ticker === 'string' &&
     p.ticker.length >= 2 && p.ticker.charCodeAt(0) >= 32 &&
-    typeof p.capital === 'number' && p.capital > 0
-  );
+    Number(p.capital) > 0
+  ).map(p => ({ ticker: p.ticker, capital: Number(p.capital), name: p.name || '' }));
   _render();
 }
 
@@ -117,7 +128,7 @@ function _render() {
       name.textContent = p.name || '';
       const amount = document.createElement('span');
       amount.className = 'etf-amount';
-      amount.textContent = fmtEur(p.capital);
+      amount.textContent = fmtEur(Number(p.capital));
       const removeBtn = document.createElement('button');
       removeBtn.className = 'etf-remove';
       removeBtn.textContent = '\u00D7';
@@ -128,6 +139,21 @@ function _render() {
     });
   }
   card.appendChild(listDiv);
+
+  if (_positions.length > 0) {
+    const clearBtn = document.createElement('button');
+    clearBtn.style.cssText =
+      'background:none;border:none;color:var(--text-t);' +
+      'font-size:11px;cursor:pointer;padding:4px 0;' +
+      'display:block;margin-left:auto;margin-bottom:8px;';
+    clearBtn.textContent = '× Svuota portafoglio';
+    clearBtn.addEventListener('click', () => {
+      _positions = [];
+      localStorage.removeItem('cmf_portfolio');
+      _render();
+    });
+    card.appendChild(clearBtn);
+  }
 
   // Distribution bar
   if (_positions.length > 0) {
@@ -213,14 +239,7 @@ function _render() {
     btnSave.textContent = '\u2713 Salvato';
     setTimeout(() => { btnSave.textContent = '\uD83D\uDCBE Salva'; }, 1500);
   });
-  // Load: open file picker for saved JSON portfolio
-  const jsonInput = document.createElement('input');
-  jsonInput.type = 'file';
-  jsonInput.accept = '.json';
-  jsonInput.hidden = true;
-  jsonInput.addEventListener('change', _onJsonLoad);
-  card.appendChild(jsonInput);
-  btnLoad.addEventListener('click', () => jsonInput.click());
+  btnLoad.addEventListener('click', () => _jsonInput && _jsonInput.click());
   fileInput.addEventListener('change', _onFileUpload);
 
   // Close autocomplete on outside click
@@ -236,7 +255,7 @@ function _addETF() {
   const amount = parseFloat(amountInput.value);
   if (!ticker || ticker.length < 2 || isNaN(amount) || amount <= 0) return;
   if (_positions.length >= 10 || _positions.some(p => p.ticker === ticker)) return;
-  _positions.push({ ticker, capital: amount, name: '' });
+  _positions.push({ ticker, capital: Number(amount), name: '' });
   input.value = '';
   const acList = _container.querySelector('#ac-list');
   if (acList) acList.hidden = true;
@@ -306,7 +325,7 @@ function _onFileUpload(e) {
           if (ticker && ticker.length >= 2 &&
               !isNaN(amount) && amount > 0 &&
               !_positions.some(p => p.ticker === ticker)) {
-            _positions.push({ ticker, capital: amount, name: '' });
+            _positions.push({ ticker, capital: Number(amount), name: '' });
           }
         }
       } catch (err) {
@@ -325,7 +344,7 @@ function _onFileUpload(e) {
           const ticker = parts[0].trim().toUpperCase();
           const amount = parseFloat(parts[1].replace(/[^\d.]/g, ''));
           if (ticker && !isNaN(amount) && amount > 0 && !_positions.some(p => p.ticker === ticker)) {
-            _positions.push({ ticker, capital: amount, name: '' });
+            _positions.push({ ticker, capital: Number(amount), name: '' });
           }
         }
       }
@@ -347,7 +366,7 @@ function _onJsonLoad(e) {
       // Accept both array format [{ticker, capital}] and wrapped {positions: [...]}
       const arr = Array.isArray(data) ? data : (data.positions || []);
       if (!Array.isArray(arr) || arr.length === 0) return;
-      _positions = arr.filter(p => p.ticker && p.capital > 0).slice(0, 10).map(p => ({
+      _positions = arr.filter(p => p.ticker && Number(p.capital) > 0).slice(0, 10).map(p => ({
         ticker: String(p.ticker).trim().toUpperCase(),
         capital: Number(p.capital) || 0,
         name: p.name || '',
