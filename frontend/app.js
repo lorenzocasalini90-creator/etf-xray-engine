@@ -12,6 +12,24 @@ import { renderSector } from './components/sector.js';
 import { renderFactor } from './components/factor.js';
 import { fmtEur } from './components/sanitize.js';
 
+// Ridimensiona grafici Plotly per la stampa
+window.addEventListener('beforeprint', () => {
+  if (!window.Plotly) return;
+  document.querySelectorAll('.js-plotly-plot')
+    .forEach(plot => {
+      try { Plotly.relayout(plot, { width: 480 }); } catch (e) {}
+    });
+});
+
+window.addEventListener('afterprint', () => {
+  if (!window.Plotly) return;
+  document.querySelectorAll('.js-plotly-plot')
+    .forEach(plot => {
+      try { Plotly.relayout(plot, { autosize: true, width: null }); } catch (e) {}
+    });
+  window.dispatchEvent(new Event('resize'));
+});
+
 // Progress messages shown during loading
 const PROGRESS_MSGS = [
   { t: 0,  msg: 'Scarico composizione ETF...' },

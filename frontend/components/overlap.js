@@ -109,13 +109,38 @@ export function renderOverlap(container, data) {
 
       const detail = document.createElement('div');
       detail.className = 'red-detail';
-      const coveredBy = r.covered_by.map(obj => {
-        return Object.entries(obj)
-          .map(([k, v]) => _displayName(sanitize(k), nameMap) + ' ' + fmtPct(v))
-          .join(', ');
-      }).join(', ');
-      detail.textContent = (coveredBy ? 'Coperto da: ' + coveredBy : '') +
-        (r.ter_waste_eur > 0 ? ' \u00B7 TER sprecato: ' + fmtEur(r.ter_waste_eur) : '');
+
+      const nonZero = r.covered_by
+        .flatMap(obj => Object.entries(obj))
+        .filter(([, v]) => Number(v) > 0)
+        .sort((a, b) => b[1] - a[1]);
+
+      if (nonZero.length === 0) {
+        detail.textContent = 'Nessun overlap con gli altri ETF del portafoglio';
+        detail.style.color = 'var(--text-t)';
+      } else {
+        nonZero.forEach(([k, v], i) => {
+          if (i > 0) {
+            const sep = document.createElement('span');
+            sep.textContent = ' \u00B7 ';
+            sep.style.color = 'var(--text-t)';
+            sep.style.fontSize = '10px';
+            detail.appendChild(sep);
+          }
+          const span = document.createElement('span');
+          const style = _overlapColor(Number(v));
+          span.style.color = style.color;
+          span.style.fontWeight = style.fontWeight;
+          span.textContent = _shortName(sanitize(k), nameMap) + ' ' + fmtPct(Number(v));
+          detail.appendChild(span);
+        });
+        if (r.ter_waste_eur > 0) {
+          const ter = document.createElement('span');
+          ter.style.cssText = 'color:var(--text-t);display:block;margin-top:4px;';
+          ter.textContent = 'TER sprecato: ' + fmtEur(r.ter_waste_eur);
+          detail.appendChild(ter);
+        }
+      }
 
       card.append(ticker, isinSmall, pctRow, progWrap, detail);
       grid.appendChild(card);
@@ -183,14 +208,31 @@ export function renderOverlap(container, data) {
 
 function _displayName(id, nameMap = {}) {
   if (!id) return '—';
-  // Name available from the API: return the full string, let CSS
-  // (ellipsis on .red-ticker) or line-wrap on .red-detail handle
-  // the visual truncation.
   if (nameMap[id]) return nameMap[id];
-  // Short tickers (SWDA, CSPX, VWCE…) are already readable.
   if (id.length <= 6) return id;
-  // Long ISIN without a known name: abbreviate.
   return id.substring(0, 8) + '…';
+}
+
+function _shortName(id, nameMap = {}) {
+  if (!id) return '—';
+  if (!nameMap[id]) {
+    if (id.length <= 6) return id;
+    return id.substring(0, 8) + '…';
+  }
+  const full = nameMap[id];
+  const clean = full
+    .replace(/\s+(UCITS|ETF|USD|EUR|GBP|Acc|Inc|Distributing|Accumulating)\b.*/gi, '')
+    .trim();
+  const name = clean || full;
+  return name.length > 22 ? name.substring(0, 21) + '…' : name;
+}
+
+function _overlapColor(pct) {
+  if (pct > 50)  return { color: '#B91C1C', fontWeight: '700' };
+  if (pct > 35)  return { color: '#FF6B6B', fontWeight: '600' };
+  if (pct > 15)  return { color: '#F97316', fontWeight: '600' };
+  if (pct > 0)   return { color: '#F59E0B', fontWeight: '500' };
+  return { color: 'var(--text-t)', fontWeight: '400' };
 }
 
 function _makeHeader(num, title, desc) {

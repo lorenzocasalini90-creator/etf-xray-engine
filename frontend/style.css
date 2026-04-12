@@ -900,7 +900,15 @@ input, select { font-family: inherit; }
   /* Heatmap scales to page */
   #heatmap-container {
     max-width: 100% !important;
-    overflow: hidden !important;
+    overflow: visible !important;
+    page-break-inside: avoid;
+  }
+  #heatmap-container .js-plotly-plot,
+  #heatmap-container svg {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
   }
   .plotly-chart {
     page-break-inside: avoid;
