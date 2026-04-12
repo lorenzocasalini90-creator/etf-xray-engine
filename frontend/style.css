@@ -833,25 +833,136 @@ input, select { font-family: inherit; }
 
 /* ── Responsive ───────────────────────────────────── */
 @media (max-width: 768px) {
-  #topbar { padding: 0 16px; }
-  .topbar-nav a { font-size: 11px; padding: 6px 8px; }
-  .topbar-chip { display: none; }
 
-  #hero-bar { flex-wrap: wrap; padding: 12px 16px; gap: 4px; }
-  .hero-stat { padding: 4px 12px; min-width: 70px; }
-  .hero-value { font-size: 14px; }
-  .hero-edit { margin-left: 0; margin-top: 8px; width: 100%; text-align: center; }
+  /* ── M7. Topbar: compact nav, hide PDF btn ──────── */
+  #topbar {
+    padding: 0 10px !important;
+    gap: 8px !important;
+  }
+  .topbar-nav a {
+    font-size: 14px !important;
+    padding: 6px 6px !important;
+  }
+  .btn-pdf { display: none !important; }
+  .topbar-chip {
+    display: flex !important;
+    font-size: 10px !important;
+    padding: 3px 7px !important;
+  }
 
-  #portfolio-input { padding: 24px 16px; }
+  /* ── M1. Hero bar: 2×2 grid, hide secondary KPIs ── */
+  .hero-stat-secondary { display: none; }
+  #hero-bar {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    padding: 12px 16px !important;
+  }
+  .hero-stat {
+    padding: 8px 12px !important;
+    min-width: unset !important;
+    border-right: none !important;
+    border-bottom: 0.5px solid rgba(255,255,255,0.10);
+    align-items: flex-start !important;
+  }
+  .hero-value { font-size: 18px !important; }
+  .hero-label { font-size: 9px !important; }
+  .hero-edit {
+    grid-column: 1 / -1;
+    margin: 4px 0 0 0 !important;
+    width: 100% !important;
+    text-align: center;
+    border-top: 0.5px solid rgba(255,255,255,0.10);
+    padding-top: 8px !important;
+  }
+
+  /* ── M2. Form: full-width inputs, stacked buttons ── */
+  #portfolio-input {
+    padding: 16px 12px !important;
+    max-width: 100% !important;
+  }
+  .form-card {
+    padding: 20px 16px !important;
+    border-radius: 8px !important;
+  }
+  .form-title { font-size: 22px !important; }
+  .form-subtitle { font-size: 13px !important; }
   .form-row { flex-direction: column; }
-  .form-card { padding: 20px; }
+  .form-field input, .form-field select {
+    font-size: 16px !important; /* prevent iOS zoom */
+    padding: 11px 12px !important;
+  }
+  .btn-add {
+    width: 100%;
+    padding: 11px 16px !important;
+    font-size: 14px !important;
+    margin-top: 4px;
+  }
+  .form-actions {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .btn-secondary {
+    width: 100% !important;
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+  }
 
-  .report-section { padding: 24px 16px; }
+  /* ── M3. KPI cards: smaller font, word-break ─────── */
+  .kpi-value {
+    font-size: 24px !important;
+    line-height: 1.1 !important;
+    word-break: break-word;
+    hyphens: auto;
+  }
+  .kpi-card { padding: 12px 14px !important; }
+  .kpi-label { font-size: 9px !important; }
+
+  /* ── M4. Table: hide # and Sector columns ────────── */
+  .data-table th:nth-child(1),
+  .data-table td:nth-child(1),
+  .data-table th:nth-child(5),
+  .data-table td:nth-child(5) {
+    display: none !important;
+  }
+  .data-table th:nth-child(2),
+  .data-table td:nth-child(2) {
+    max-width: 160px !important;
+  }
+  .data-table { font-size: 11px !important; }
+  .data-table tbody td { padding: 6px 6px !important; }
+  .data-table thead th { padding: 0 6px 6px !important; }
+  .mini-bar-wrap { display: none !important; }
+  .data-table td.num { font-size: 10px !important; }
+
+  /* ── M5. Charts: full-width container ────────────── */
+  .plotly-chart { min-height: 200px !important; }
+
+  /* ── M8. Report sections: full-width, compact ────── */
+  .report-section {
+    padding: 20px 12px !important;
+    max-width: 100% !important;
+  }
+  .section-title { font-size: 15px !important; }
+  .section-num {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 11px !important;
+  }
+  .section-desc { margin-left: 0; margin-top: 4px; flex-basis: 100%; }
+  .card { padding: 14px !important; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .redundancy-grid { grid-template-columns: 1fr; }
 
-  .section-desc { margin-left: 0; margin-top: 4px; flex-basis: 100%; }
+  /* Active bets & factors: compact */
+  .bet-row { font-size: 11px !important; }
+  .bet-delta { font-size: 11px !important; }
+  .factor-bar-label {
+    min-width: 80px !important;
+    font-size: 11px !important;
+  }
+  .red-pct { font-size: 22px !important; }
 }
 
 /* ── Scroll cue between sections ──────────────────── */

@@ -21,11 +21,18 @@ export function renderBars(containerId, labels, values, colors, options = {}) {
     cliponaxis: false,
   }];
 
+  const isMobile = window.innerWidth < 600;
   const layout = {
     paper_bgcolor: 'white',
     plot_bgcolor: 'white',
-    font: { family: 'DM Sans, sans-serif', size: 11, color: '#111827' },
-    margin: { l: 140, r: 70, t: 10, b: 20 },
+    font: {
+      family: 'DM Sans, sans-serif',
+      size: isMobile ? 9 : 11,
+      color: '#111827',
+    },
+    margin: isMobile
+      ? { l: 90, r: 40, t: 10, b: 20 }
+      : { l: 140, r: 70, t: 10, b: 20 },
     xaxis: {
       showgrid: true,
       gridcolor: '#D1D5DB',
@@ -38,7 +45,9 @@ export function renderBars(containerId, labels, values, colors, options = {}) {
     yaxis: {
       automargin: true,
     },
-    height: options.height || 300,
+    height: isMobile
+      ? Math.max(200, labels.length * 22)
+      : (options.height || 300),
     bargap: 0.3,
   };
 

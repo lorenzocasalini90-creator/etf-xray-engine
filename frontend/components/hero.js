@@ -30,9 +30,13 @@ export function renderHero(container, kpis, fetchMetadata, totalEur) {
     { label: 'Copertura', value: fetchMetadata.coverage_pct.toFixed(0) + '%', cls: '' },
   ];
 
+  const MOBILE_HIDDEN = ['Titoli Unici', 'Effective N', 'Top 10'];
   stats.forEach(s => {
     const div = document.createElement('div');
     div.className = 'hero-stat';
+    if (MOBILE_HIDDEN.includes(s.label)) {
+      div.classList.add('hero-stat-secondary');
+    }
     const lbl = document.createElement('span');
     lbl.className = 'hero-label';
     lbl.textContent = s.label;
