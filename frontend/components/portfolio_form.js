@@ -143,10 +143,7 @@ function _render() {
 
   if (_positions.length > 0) {
     const clearBtn = document.createElement('button');
-    clearBtn.style.cssText =
-      'background:none;border:none;color:var(--text-t);' +
-      'font-size:11px;cursor:pointer;padding:4px 0;' +
-      'display:block;margin-left:auto;margin-bottom:8px;';
+    clearBtn.className = 'btn-clear-all';
     clearBtn.textContent = '× Svuota portafoglio';
     clearBtn.addEventListener('click', () => {
       _positions = [];

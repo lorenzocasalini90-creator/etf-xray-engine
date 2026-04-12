@@ -804,8 +804,32 @@ input, select { font-family: inherit; }
 .bet-delta.pos { color: var(--green-text); }
 .bet-delta.neg { color: var(--red-text); }
 
+/* ── Clear all button ────────────────────────────── */
+.btn-clear-all {
+  background: none;
+  border: 1px solid var(--coral);
+  color: var(--coral);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 3px 10px;
+  border-radius: 6px;
+  display: block;
+  margin-left: auto;
+  margin-bottom: 10px;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.btn-clear-all:hover {
+  background: var(--red-pale);
+  color: var(--red-text);
+}
+
 /* ── Plotly container ─────────────────────────────── */
 .plotly-chart { width: 100%; min-height: 280px; }
+
+/* ── Heatmap print table (hidden on screen) ──────── */
+.heatmap-print { display: none; }
 
 /* ── Responsive ───────────────────────────────────── */
 @media (max-width: 768px) {
@@ -897,22 +921,29 @@ input, select { font-family: inherit; }
     margin-bottom: 16px !important;
   }
 
-  /* Heatmap scales to page */
+  /* Heatmap: show HTML table, hide Plotly */
+  .heatmap-print {
+    display: block !important;
+    width: 100%;
+    overflow: visible;
+  }
+  #heatmap-container .js-plotly-plot,
+  #heatmap-container .plotly-graph-div {
+    display: none !important;
+  }
   #heatmap-container {
     max-width: 100% !important;
     overflow: visible !important;
     page-break-inside: avoid;
   }
-  #heatmap-container .js-plotly-plot,
-  #heatmap-container svg {
-    max-width: 100% !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
   .plotly-chart {
     page-break-inside: avoid;
     max-height: 380px !important;
+  }
+  /* Force background colors in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .report-section {
