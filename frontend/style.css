@@ -829,7 +829,7 @@ input, select { font-family: inherit; }
 .plotly-chart { width: 100%; min-height: 280px; }
 
 /* ── Heatmap print table (hidden on screen) ──────── */
-.heatmap-print { display: none; }
+.heatmap-print-wrapper { display: none; }
 
 /* ── Responsive ───────────────────────────────────── */
 @media (max-width: 768px) {
@@ -921,14 +921,17 @@ input, select { font-family: inherit; }
     margin-bottom: 16px !important;
   }
 
-  /* Heatmap: beforeprint JS handles Plotly ↔ table swap */
-  #heatmap-container {
-    overflow: visible !important;
+  /* Heatmap: beforeprint JS hides Plotly, CSS shows wrapper */
+  .heatmap-print-wrapper {
+    display: block !important;
+    width: 100%;
     page-break-inside: avoid;
+  }
+  #heatmap-container {
+    display: none !important;
   }
   .plotly-chart {
     page-break-inside: avoid;
-    max-height: 380px !important;
   }
   .btn-clear-all { display: none !important; }
   /* Force background colors in print */

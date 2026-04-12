@@ -87,90 +87,115 @@ export function renderHeatmap(containerId, matrix, tickers, nameMap = {}) {
 
   Plotly.newPlot(el, data, layout, config);
 
-  // Generate HTML table for print (Plotly SVG gets clipped on A4)
-  _renderPrintTable(el, matrix, tickers, nameMap);
+  // Remove any old print table (was inside el in previous version)
+  const oldInner = el.querySelector('.heatmap-print');
+  if (oldInner) oldInner.remove();
+
+  // Create print table as SIBLING after the Plotly container (not inside it)
+  const oldSibling = el.nextElementSibling;
+  if (oldSibling && oldSibling.classList.contains('heatmap-print-wrapper')) {
+    oldSibling.remove();
+  }
+  const printWrapper = document.createElement('div');
+  printWrapper.className = 'heatmap-print-wrapper';
+  el.parentNode.insertBefore(printWrapper, el.nextSibling);
+  _renderPrintTable(printWrapper, matrix, tickers, nameMap);
 }
 
-function _renderPrintTable(container, matrix, tickers, nameMap) {
-  const prev = container.querySelector('.heatmap-print');
-  if (prev) prev.remove();
-
-  const wrap = document.createElement('div');
-  wrap.className = 'heatmap-print';
+function _renderPrintTable(wrapper, matrix, tickers, nameMap) {
+  while (wrapper.firstChild) wrapper.removeChild(wrapper.firstChild);
 
   const table = document.createElement('table');
-  table.style.cssText =
-    'width:100%;border-collapse:collapse;font-size:7px;table-layout:fixed;';
+  table.style.cssText = [
+    'width:100%',
+    'border-collapse:collapse',
+    'font-size:6.5px',
+    'font-family:DM Sans,sans-serif',
+    'table-layout:fixed',
+    'page-break-inside:avoid',
+  ].join(';');
 
-  // Header row
+  // Header — horizontal labels (vertical ones get truncated in print)
   const thead = document.createElement('thead');
   const hrow = document.createElement('tr');
-  const th0 = document.createElement('th');
-  th0.style.cssText = 'width:70px;';
-  hrow.appendChild(th0);
+  const corner = document.createElement('th');
+  corner.style.cssText = 'width:80px;border:none;';
+  hrow.appendChild(corner);
 
   tickers.forEach(t => {
     const th = document.createElement('th');
-    th.style.cssText =
-      'writing-mode:vertical-rl;text-orientation:mixed;' +
-      'transform:rotate(180deg);max-height:60px;overflow:hidden;' +
-      'font-size:7px;font-weight:600;padding:2px;text-align:left;' +
-      'white-space:nowrap;';
+    th.style.cssText = [
+      'font-size:6px',
+      'font-weight:600',
+      'padding:2px 1px',
+      'text-align:center',
+      'border:0.5px solid #E5E7EB',
+      'background:#F9FAFB',
+      'overflow:hidden',
+      'white-space:nowrap',
+      'text-overflow:ellipsis',
+      'max-width:50px',
+    ].join(';');
     th.textContent = _label(t, nameMap);
+    th.title = nameMap[t] || t;
     hrow.appendChild(th);
   });
   thead.appendChild(hrow);
   table.appendChild(thead);
 
-  // Body rows
+  // Body
   const tbody = document.createElement('tbody');
   matrix.forEach((row, ri) => {
     const tr = document.createElement('tr');
 
-    const td0 = document.createElement('td');
-    td0.style.cssText =
-      'font-size:7px;font-weight:600;padding:2px 4px;' +
-      'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
-      'max-width:70px;';
-    td0.textContent = _label(tickers[ri], nameMap);
-    tr.appendChild(td0);
+    const tdLabel = document.createElement('td');
+    tdLabel.style.cssText = [
+      'font-size:6px',
+      'font-weight:600',
+      'padding:2px 3px',
+      'white-space:nowrap',
+      'overflow:hidden',
+      'text-overflow:ellipsis',
+      'max-width:80px',
+      'border:0.5px solid #E5E7EB',
+      'background:#F9FAFB',
+    ].join(';');
+    tdLabel.textContent = _label(tickers[ri], nameMap);
+    tr.appendChild(tdLabel);
 
     row.forEach((val, ci) => {
       const td = document.createElement('td');
-      td.style.cssText =
-        'text-align:center;padding:1px;font-size:7px;' +
-        'font-weight:' + (ri === ci ? '700' : '400') + ';';
+      const isdiag = (ri === ci);
+      let bg, color, text;
 
-      if (ri === ci) {
-        td.style.background = '#1B2A4A';
-        td.style.color = '#fff';
-        td.textContent = '—';
+      if (isdiag) {
+        bg = '#1B2A4A'; color = '#fff'; text = '\u25A0';
       } else if (val > 50) {
-        td.style.background = '#FF6B6B';
-        td.style.color = '#fff';
-        td.textContent = val.toFixed(1) + '%';
+        bg = '#FF6B6B'; color = '#fff'; text = val.toFixed(1) + '%';
       } else if (val > 35) {
-        td.style.background = '#FEE2E2';
-        td.style.color = '#B91C1C';
-        td.textContent = val.toFixed(1) + '%';
+        bg = '#FEE2E2'; color = '#B91C1C'; text = val.toFixed(1) + '%';
       } else if (val > 15) {
-        td.style.background = '#FEF3C7';
-        td.style.color = '#92400E';
-        td.textContent = val.toFixed(1) + '%';
+        bg = '#FEF3C7'; color = '#92400E'; text = val.toFixed(1) + '%';
       } else if (val > 0) {
-        td.style.background = '#F0FDF4';
-        td.style.color = '#15803D';
-        td.textContent = val.toFixed(1) + '%';
+        bg = '#F0FDF4'; color = '#15803D'; text = val.toFixed(1) + '%';
       } else {
-        td.style.background = '#F9FAFB';
-        td.style.color = '#9CA3AF';
-        td.textContent = '0%';
+        bg = '#FFFFFF'; color = '#D1D5DB'; text = '0';
       }
+
+      td.style.cssText = [
+        'text-align:center',
+        'padding:1.5px 1px',
+        'font-size:6px',
+        'border:0.5px solid #E5E7EB',
+        'background:' + bg,
+        'color:' + color,
+        isdiag ? 'font-weight:700' : 'font-weight:400',
+      ].join(';');
+      td.textContent = text;
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  wrap.appendChild(table);
-  container.appendChild(wrap);
+  wrapper.appendChild(table);
 }

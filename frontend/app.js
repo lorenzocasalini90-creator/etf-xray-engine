@@ -12,38 +12,30 @@ import { renderSector } from './components/sector.js';
 import { renderFactor } from './components/factor.js';
 import { fmtEur } from './components/sanitize.js';
 
-// Swap Plotly SVG ↔ HTML table for print (CSS display:none doesn't work on Plotly in Chrome)
+// Print: hide Plotly container with visibility:hidden, show HTML table wrapper
 window.addEventListener('beforeprint', () => {
-  document.querySelectorAll('#heatmap-container').forEach(container => {
-    const plotDiv = container.querySelector('.js-plotly-plot, .plotly-graph-div');
-    if (plotDiv) {
-      plotDiv.dataset.printHidden = 'true';
-      plotDiv.style.setProperty('display', 'none', 'important');
-      plotDiv.style.setProperty('visibility', 'hidden', 'important');
-      plotDiv.style.setProperty('height', '0', 'important');
-      plotDiv.style.setProperty('overflow', 'hidden', 'important');
-    }
-    const printTable = container.querySelector('.heatmap-print');
-    if (printTable) {
-      printTable.style.setProperty('display', 'block', 'important');
-    }
+  document.querySelectorAll('#heatmap-container').forEach(el => {
+    el.style.setProperty('visibility', 'hidden', 'important');
+    el.style.setProperty('height', '0px', 'important');
+    el.style.setProperty('overflow', 'hidden', 'important');
+    el.style.setProperty('margin', '0', 'important');
+    el.style.setProperty('padding', '0', 'important');
+  });
+  document.querySelectorAll('.heatmap-print-wrapper').forEach(el => {
+    el.style.setProperty('display', 'block', 'important');
   });
 });
 
 window.addEventListener('afterprint', () => {
-  document.querySelectorAll('#heatmap-container').forEach(container => {
-    const plotDiv = container.querySelector('[data-print-hidden="true"]');
-    if (plotDiv) {
-      plotDiv.style.removeProperty('display');
-      plotDiv.style.removeProperty('visibility');
-      plotDiv.style.removeProperty('height');
-      plotDiv.style.removeProperty('overflow');
-      delete plotDiv.dataset.printHidden;
-    }
-    const printTable = container.querySelector('.heatmap-print');
-    if (printTable) {
-      printTable.style.removeProperty('display');
-    }
+  document.querySelectorAll('#heatmap-container').forEach(el => {
+    el.style.removeProperty('visibility');
+    el.style.removeProperty('height');
+    el.style.removeProperty('overflow');
+    el.style.removeProperty('margin');
+    el.style.removeProperty('padding');
+  });
+  document.querySelectorAll('.heatmap-print-wrapper').forEach(el => {
+    el.style.removeProperty('display');
   });
   window.dispatchEvent(new Event('resize'));
 });
