@@ -12,6 +12,42 @@ import { renderSector } from './components/sector.js';
 import { renderFactor } from './components/factor.js';
 import { fmtEur } from './components/sanitize.js';
 
+// Swap Plotly SVG ↔ HTML table for print (CSS display:none doesn't work on Plotly in Chrome)
+window.addEventListener('beforeprint', () => {
+  document.querySelectorAll('#heatmap-container').forEach(container => {
+    const plotDiv = container.querySelector('.js-plotly-plot, .plotly-graph-div');
+    if (plotDiv) {
+      plotDiv.dataset.printHidden = 'true';
+      plotDiv.style.setProperty('display', 'none', 'important');
+      plotDiv.style.setProperty('visibility', 'hidden', 'important');
+      plotDiv.style.setProperty('height', '0', 'important');
+      plotDiv.style.setProperty('overflow', 'hidden', 'important');
+    }
+    const printTable = container.querySelector('.heatmap-print');
+    if (printTable) {
+      printTable.style.setProperty('display', 'block', 'important');
+    }
+  });
+});
+
+window.addEventListener('afterprint', () => {
+  document.querySelectorAll('#heatmap-container').forEach(container => {
+    const plotDiv = container.querySelector('[data-print-hidden="true"]');
+    if (plotDiv) {
+      plotDiv.style.removeProperty('display');
+      plotDiv.style.removeProperty('visibility');
+      plotDiv.style.removeProperty('height');
+      plotDiv.style.removeProperty('overflow');
+      delete plotDiv.dataset.printHidden;
+    }
+    const printTable = container.querySelector('.heatmap-print');
+    if (printTable) {
+      printTable.style.removeProperty('display');
+    }
+  });
+  window.dispatchEvent(new Event('resize'));
+});
+
 // Progress messages shown during loading
 const PROGRESS_MSGS = [
   { t: 0,  msg: 'Scarico composizione ETF...' },
