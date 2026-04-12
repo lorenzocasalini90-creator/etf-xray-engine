@@ -141,6 +141,51 @@ def _get_etf_name(
     return None
 
 
+def _persist_etf_name(identifier: str, name: str) -> None:
+    """Aggiunge identifier→nome al CSV se non già presente.
+
+    Aggiorna sia la cache in-memory sia il file su disco.
+    """
+    if not name or not identifier:
+        return
+    try:
+        from api.routes.etf_search import _load_directory
+        import api.routes.etf_search as _es
+
+        directory = _load_directory()
+        if directory is None or directory.empty:
+            return
+        ident_up = identifier.strip().upper()
+        already = (
+            directory["isin"].str.upper() == ident_up
+        ) | (
+            directory["ticker"].str.upper() == ident_up
+        )
+        if already.any():
+            return
+
+        new_row = pd.DataFrame([{
+            "isin": identifier if len(identifier) == 12 else "",
+            "ticker": identifier if len(identifier) <= 6 else identifier,
+            "name": name,
+            "provider": "",
+            "ter_pct": "",
+            "domicile": identifier[:2] if len(identifier) == 12 else "",
+        }])
+        updated = pd.concat([directory, new_row], ignore_index=True)
+        _es._directory_cache = updated
+
+        from pathlib import Path
+        csv_path = (
+            Path(__file__).resolve().parent.parent.parent
+            / "src" / "dashboard" / "data" / "etf_directory.csv"
+        )
+        updated.to_csv(csv_path, index=False)
+        logger.info("ETF directory: added %s → %s", identifier, name)
+    except Exception as exc:
+        logger.debug("Failed to persist ETF name: %s", exc)
+
+
 def _build_overlap(
     holdings_db: dict[str, pd.DataFrame],
 ) -> OverlapResult:
@@ -175,6 +220,7 @@ def _build_overlap(
         name = _get_etf_name(t, holdings_db)
         if name:
             ticker_names[t] = name
+            _persist_etf_name(t, name)
 
     return OverlapResult(
         matrix=matrix_list,
@@ -195,9 +241,12 @@ def _build_redundancy(
         ticker = row["etf_ticker"]
         breakdown = redundancy_breakdown(ticker, holdings_db)
         covered_by = [{k: v} for k, v in breakdown.items()]
+        etf_name = _get_etf_name(ticker, holdings_db)
+        if etf_name:
+            _persist_etf_name(ticker, etf_name)
         items.append(RedundancyItem(
             etf_ticker=ticker,
-            etf_name=_get_etf_name(ticker, holdings_db),
+            etf_name=etf_name,
             redundancy_pct=round(row["redundancy_pct"], 2),
             ter_waste_eur=round(row["ter_wasted"], 2),
             covered_by=covered_by,
