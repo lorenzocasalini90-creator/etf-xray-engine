@@ -161,6 +161,24 @@ async function onAnalyze(positions, benchmark) {
       : 0;
     setOverlapAlert(maxRedundancy > 70);
 
+    // Add mobile PDF button at bottom of report (if not already present)
+    if (!document.getElementById('btn-pdf-mobile')) {
+      const mobilePdf = document.createElement('div');
+      mobilePdf.style.cssText = 'padding:16px 12px 32px;display:none;';
+      mobilePdf.className = 'mobile-pdf-wrap';
+      const btn = document.createElement('button');
+      btn.id = 'btn-pdf-mobile';
+      btn.className = 'btn-cta';
+      btn.style.cssText =
+        'width:100%;font-size:14px;padding:13px;' +
+        'display:flex;align-items:center;' +
+        'justify-content:center;gap:8px;';
+      btn.textContent = '\uD83D\uDCC4 Esporta PDF';
+      btn.addEventListener('click', () => { window.print(); });
+      mobilePdf.appendChild(btn);
+      report.appendChild(mobilePdf);
+    }
+
     requestAnimationFrame(() => {
       document.getElementById('s-xray').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
