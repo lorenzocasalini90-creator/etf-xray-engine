@@ -834,21 +834,30 @@ input, select { font-family: inherit; }
 /* ── Responsive ───────────────────────────────────── */
 @media (max-width: 768px) {
 
-  /* ── M7. Topbar: compact nav, hide PDF btn ──────── */
+  /* ── M1/v2. Topbar: compact nav, hide PDF+chip+mod ── */
   #topbar {
     padding: 0 10px !important;
     gap: 8px !important;
   }
+  .topbar-logo {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .topbar-nav {
+    gap: 0 !important;
+    flex: 1;
+    justify-content: space-around;
+  }
   .topbar-nav a {
-    font-size: 14px !important;
-    padding: 6px 6px !important;
+    font-size: clamp(10px, 2.8vw, 13px) !important;
+    padding: 6px 4px !important;
+    white-space: nowrap;
   }
   .btn-pdf { display: none !important; }
-  .topbar-chip {
-    display: flex !important;
-    font-size: 10px !important;
-    padding: 3px 7px !important;
-  }
+  .topbar-chip { display: none !important; }
+  #topbar-mod { display: none !important; }
 
   /* ── M1. Hero bar: 2×2 grid, hide secondary KPIs ── */
   .hero-stat-secondary { display: none; }
@@ -866,7 +875,15 @@ input, select { font-family: inherit; }
     align-items: flex-start !important;
   }
   .hero-value { font-size: 18px !important; }
-  .hero-label { font-size: 9px !important; }
+  .hero-label {
+    font-size: 8px !important;
+    letter-spacing: 0 !important;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
   .hero-edit {
     grid-column: 1 / -1;
     margin: 4px 0 0 0 !important;
@@ -910,13 +927,19 @@ input, select { font-family: inherit; }
 
   /* ── M3. KPI cards: smaller font, word-break ─────── */
   .kpi-value {
-    font-size: 24px !important;
+    font-size: 22px !important;
     line-height: 1.1 !important;
     word-break: break-word;
     hyphens: auto;
   }
   .kpi-card { padding: 12px 14px !important; }
-  .kpi-label { font-size: 9px !important; }
+  .kpi-label {
+    font-size: 8px !important;
+    letter-spacing: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   /* ── M4. Table: hide # and Sector columns ────────── */
   .data-table th:nth-child(1),
@@ -955,12 +978,39 @@ input, select { font-family: inherit; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .redundancy-grid { grid-template-columns: 1fr; }
 
-  /* Active bets & factors: compact */
+  /* Active bets: compact delta */
   .bet-row { font-size: 11px !important; }
-  .bet-delta { font-size: 11px !important; }
-  .factor-bar-label {
-    min-width: 80px !important;
+  .bet-name { font-size: 11px !important; }
+  .bet-delta {
     font-size: 11px !important;
+    min-width: 48px !important;
+  }
+
+  /* Factor: compact bars, badges, coverage legend */
+  .factor-bar-label {
+    min-width: 70px !important;
+    font-size: 10px !important;
+  }
+  .factor-bar-value {
+    font-size: 11px !important;
+    min-width: 28px !important;
+  }
+  .factor-tilt-badges {
+    gap: 6px !important;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 10px !important;
+    padding: 2px 7px !important;
+  }
+  .coverage-legend {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 4px 8px !important;
+    margin-top: 8px !important;
+  }
+  .coverage-legend-item {
+    font-size: 10px !important;
   }
   .red-pct { font-size: 22px !important; }
 }

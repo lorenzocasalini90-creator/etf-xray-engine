@@ -53,10 +53,11 @@ export function renderFactor(container, data) {
   // Tilt badges
   const badgesDiv = document.createElement('div');
   badgesDiv.className = 'factor-tilt-badges';
+  const isMobile = window.innerWidth < 600;
   factors.dimensions.forEach(d => {
     const badge = document.createElement('span');
     badge.className = 'badge badge-navy';
-    badge.textContent = d.name + ': ' + d.tilt;
+    badge.textContent = isMobile ? d.tilt : d.name + ': ' + d.tilt;
     badgesDiv.appendChild(badge);
   });
   // Reliability badge

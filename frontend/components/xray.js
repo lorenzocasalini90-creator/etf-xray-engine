@@ -54,10 +54,11 @@ export function renderXRay(container, data) {
   const hhiClass = kpis.hhi > 0.05 ? 'kpi-coral'
                  : kpis.hhi > 0.01 ? 'kpi-amber'
                  : 'kpi-green';
+  const isMobile = window.innerWidth < 600;
   const kpiData = [
     { label: 'Titoli unici', value: fmtNum(kpis.unique_securities), cls: '' },
     { label: 'Active Share', value: asValue, cls: asClass },
-    { label: 'HHI (concentrazione)', value: Number(kpis.hhi).toFixed(4), cls: hhiClass },
+    { label: isMobile ? 'HHI' : 'HHI (concentrazione)', value: Number(kpis.hhi).toFixed(4), cls: hhiClass },
     { label: 'TER inefficienza', value: fmtEur(terWaste) + '/anno', cls: 'kpi-coral' },
   ];
   const kpiGrid = document.createElement('div');
@@ -68,7 +69,8 @@ export function renderXRay(container, data) {
     const lbl = document.createElement('div');
     lbl.className = 'kpi-label';
     lbl.textContent = k.label;
-    const info = TOOLTIPS[k.label];
+    const tooltipKey = k.label === 'HHI' ? 'HHI (concentrazione)' : k.label;
+    const info = TOOLTIPS[tooltipKey];
     if (info) lbl.appendChild(makeInfoIcon(info, {dark: false}));
     const val = document.createElement('div');
     val.className = 'kpi-value' + (k.cls ? ' ' + k.cls : '');

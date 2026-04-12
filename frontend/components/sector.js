@@ -61,7 +61,18 @@ export function renderSector(container, data) {
       .sort((a, b) => a.portfolio_pct - b.portfolio_pct)
       .slice(-15);
 
-    const sLabels = sectors.map(s => s.label);
+    const SECTOR_SHORT = {
+      'Information Technology':  'Info Tech',
+      'Consumer Discretionary':  'Consumer Disc.',
+      'Communication Services':  'Communication',
+      'Consumer Staples':        'Consumer Stap.',
+      'Financial Services':      'Fin. Services',
+      'Cash and/or Derivatives': 'Cash/Derivati',
+    };
+    const isMobile = window.innerWidth < 600;
+    const sLabels = sectors.map(s =>
+      isMobile ? (SECTOR_SHORT[s.label] || s.label) : s.label
+    );
     const sValues = sectors.map(s => s.portfolio_pct);
     const sColors = sLabels.map(l =>
       l === 'Unknown' ? '#D1D5DB' : '#1B2A4A'

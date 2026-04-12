@@ -67,7 +67,14 @@ export function renderOverlap(container, data) {
 
     const grid = document.createElement('div');
     grid.className = 'redundancy-grid';
-    redundancy.forEach(r => {
+
+    const isMobileRed = window.innerWidth < 600;
+    const withOverlap = isMobileRed
+      ? redundancy.filter(r => r.redundancy_pct > 0) : redundancy;
+    const zeroOverlap = isMobileRed
+      ? redundancy.filter(r => r.redundancy_pct === 0) : [];
+
+    withOverlap.forEach(r => {
       const verdict = r.redundancy_pct < 30 ? 'green' : r.redundancy_pct < 70 ? 'yellow' : 'red';
       const pctClass = r.redundancy_pct < 30 ? 'green' : r.redundancy_pct < 70 ? 'amber' : 'red';
       const card = document.createElement('div');
@@ -145,6 +152,31 @@ export function renderOverlap(container, data) {
       card.append(ticker, isinSmall, pctRow, progWrap, detail);
       grid.appendChild(card);
     });
+
+    // Mobile: compact summary for zero-overlap ETFs
+    if (zeroOverlap.length > 0) {
+      const zeroSection = document.createElement('div');
+      zeroSection.style.cssText =
+        'margin-top:12px;padding:10px 14px;' +
+        'background:var(--bg);border-radius:8px;' +
+        'border:0.5px solid var(--border);';
+      const zeroTitle = document.createElement('div');
+      zeroTitle.style.cssText =
+        'font-size:11px;font-weight:600;' +
+        'color:var(--text-s);margin-bottom:6px;';
+      zeroTitle.textContent =
+        'ETF senza overlap (' + zeroOverlap.length + ')';
+      zeroSection.appendChild(zeroTitle);
+      const zeroList = document.createElement('div');
+      zeroList.style.cssText =
+        'font-size:11px;color:var(--text-t);line-height:1.8;';
+      zeroList.textContent = zeroOverlap
+        .map(r => _shortName(r.etf_ticker, nameMap))
+        .join(' \u00B7 ');
+      zeroSection.appendChild(zeroList);
+      grid.appendChild(zeroSection);
+    }
+
     container.appendChild(grid);
   }
 
