@@ -8,9 +8,7 @@ import { fmtPct, fmtEur } from './sanitize.js';
  * @param {object} data — { redundancy, kpis, positions }
  */
 export function renderSuggestions(container, data) {
-  console.log('[renderSuggestions] called', { container, data });
   const { redundancy = [], kpis = {}, positions = [] } = data;
-  console.log('[renderSuggestions] redundancy:', redundancy.length, 'kpis:', kpis);
   container.textContent = '';
   container.classList.add('fade-in');
 

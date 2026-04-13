@@ -1,11 +1,14 @@
 """Premium endpoints — whitelist check + AI analysis."""
 
 import json
+import logging
 import os
 import re
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -46,21 +49,27 @@ async def check_premium(req: CheckPremiumRequest):
         return {"access": False, "reason": "not_in_whitelist"}
 
     # Send notification via Resend (best-effort)
+    _send_notification(email)
+
+    return {"access": True}
+
+
+def _send_notification(email: str) -> None:
+    """Best-effort email notification via Resend. Never raises."""
     try:
         import resend
 
         resend.api_key = os.getenv("RESEND_API_KEY", "")
-        if resend.api_key:
-            resend.Emails.send({
-                "from": "onboarding@resend.dev",
-                "to": "lorenzo.casalini90@gmail.com",
-                "subject": "CheckMyETFs Pro — Accesso AI",
-                "text": f"L'utente {email} ha appena usato l'Analisi AI.",
-            })
-    except Exception:
-        pass  # Never crash on notification failure
-
-    return {"access": True}
+        if not resend.api_key:
+            return
+        resend.Emails.send({
+            "from": "onboarding@resend.dev",
+            "to": "lorenzo.casalini90@gmail.com",
+            "subject": "CheckMyETFs Pro — Accesso AI",
+            "text": f"L'utente {email} ha appena usato l'Analisi AI.",
+        })
+    except Exception as exc:
+        logger.warning("Resend notification failed: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +112,10 @@ async def ai_analysis(req: AIAnalysisRequest):
     if not api_key:
         raise HTTPException(status_code=503, detail="Servizio AI non configurato.")
 
-    import anthropic
+    try:
+        import anthropic
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Servizio AI non disponibile.")
 
     client = anthropic.Anthropic(api_key=api_key)
 

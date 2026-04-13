@@ -1,5 +1,5 @@
 /**
- * AI Analysis premium card + modal + result rendering.
+ * AI Analysis premium card — two-path funnel (no auto-modal).
  */
 
 const FORM_BASE =
@@ -9,14 +9,13 @@ const FORM_BASE =
 
 /**
  * @param {HTMLElement} container
- * @param {object} analysisData — full API response (kpis, redundancy, factors, etc.)
+ * @param {object} analysisData — full API response
  * @param {Array} positions — original positions array
  */
 export function renderAICard(container, analysisData, positions) {
-  console.log('[renderAICard] called', { container, analysisData: Object.keys(analysisData || {}), positions: (positions || []).length });
   container.textContent = '';
 
-  // ── Premium CTA card ──
+  // ── Navy CTA card (always visible, no modal on load) ──
   const card = document.createElement('div');
   card.className = 'card ai-premium-card';
   card.style.cssText =
@@ -29,7 +28,7 @@ export function renderAICard(container, analysisData, positions) {
 
   const title = document.createElement('span');
   title.style.cssText = 'font-size:18px;font-weight:700;';
-  title.textContent = '🤖 Analisi AI';
+  title.textContent = '\uD83E\uDD16 Analisi AI';
 
   const badge = document.createElement('span');
   badge.style.cssText =
@@ -50,90 +49,114 @@ export function renderAICard(container, analysisData, positions) {
     'background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25);' +
     'padding:10px 24px;border-radius:8px;font-size:14px;font-weight:600;' +
     'cursor:pointer;transition:background 0.2s;';
-  btn.textContent = '🔒 Analisi AI';
+  btn.textContent = 'Scopri Analisi AI \u2192';
   btn.addEventListener('mouseenter', () => { btn.style.background = 'rgba(255,255,255,0.25)'; });
   btn.addEventListener('mouseleave', () => { btn.style.background = 'rgba(255,255,255,0.15)'; });
-  btn.addEventListener('click', () => _showModal(container, analysisData, positions));
-  card.appendChild(btn);
 
+  // Click → expand inline options (no modal)
+  btn.addEventListener('click', () => {
+    btn.remove();
+    _showFunnelOptions(card, container, analysisData, positions);
+  });
+
+  card.appendChild(btn);
   container.appendChild(card);
 }
 
 
-function _showModal(parentContainer, analysisData, positions) {
-  const existing = document.getElementById('ai-modal-overlay');
-  if (existing) existing.remove();
+// ── Two-path funnel (inline, inside the navy card) ──
 
-  const overlay = document.createElement('div');
-  overlay.id = 'ai-modal-overlay';
-  overlay.style.cssText =
-    'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;' +
-    'display:flex;align-items:center;justify-content:center;padding:16px;';
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
-  });
+function _showFunnelOptions(card, parentContainer, analysisData, positions) {
+  const optionsWrap = document.createElement('div');
+  optionsWrap.style.cssText =
+    'display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;';
 
-  const modal = document.createElement('div');
-  modal.style.cssText =
-    'background:#fff;border-radius:14px;padding:28px 24px;max-width:420px;' +
-    'width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);';
+  // ── Left column: "Hai già accesso?" ──
+  const leftCol = document.createElement('div');
+  leftCol.style.cssText = 'flex:1;min-width:200px;';
 
-  const h3 = document.createElement('h3');
-  h3.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:4px;';
-  h3.textContent = '🤖 Analisi AI';
-  modal.appendChild(h3);
-
-  const subtext = document.createElement('p');
-  subtext.style.cssText = 'font-size:13px;color:var(--text-s);margin-bottom:20px;';
-  subtext.textContent = 'Inserisci la tua email per accedere';
-  modal.appendChild(subtext);
+  const leftLabel = document.createElement('p');
+  leftLabel.style.cssText =
+    'font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:8px;font-weight:600;';
+  leftLabel.textContent = 'Hai già accesso?';
+  leftCol.appendChild(leftLabel);
 
   const input = document.createElement('input');
   input.type = 'email';
   input.placeholder = 'La tua email';
   input.style.cssText =
-    'width:100%;padding:10px 14px;border:1px solid var(--border);' +
-    'border-radius:8px;font-size:14px;margin-bottom:12px;' +
-    'outline:none;text-align:left;';
-  input.addEventListener('focus', () => { input.style.borderColor = 'var(--navy)'; });
-  input.addEventListener('blur', () => { input.style.borderColor = 'var(--border)'; });
-  modal.appendChild(input);
+    'width:100%;padding:9px 12px;border:1px solid rgba(255,255,255,0.3);' +
+    'border-radius:8px;font-size:13px;background:rgba(255,255,255,0.1);' +
+    'color:#fff;outline:none;margin-bottom:8px;';
+  input.addEventListener('focus', () => { input.style.borderColor = 'rgba(255,255,255,0.6)'; });
+  input.addEventListener('blur', () => { input.style.borderColor = 'rgba(255,255,255,0.3)'; });
+  leftCol.appendChild(input);
 
   const submitBtn = document.createElement('button');
-  submitBtn.className = 'btn-cta';
   submitBtn.style.cssText =
-    'width:100%;padding:12px;font-size:14px;font-weight:600;' +
-    'border-radius:8px;border:none;background:var(--navy);color:#fff;cursor:pointer;';
-  submitBtn.textContent = 'Accedi →';
-  modal.appendChild(submitBtn);
+    'width:100%;padding:9px;border-radius:8px;border:none;' +
+    'background:#22C55E;color:#fff;font-size:13px;font-weight:600;cursor:pointer;';
+  submitBtn.textContent = 'Accedi \u2192';
+  leftCol.appendChild(submitBtn);
 
   const msgArea = document.createElement('div');
-  msgArea.style.cssText = 'margin-top:14px;';
-  modal.appendChild(msgArea);
+  msgArea.style.cssText = 'margin-top:8px;';
+  leftCol.appendChild(msgArea);
 
+  // ── Right column: "Non hai ancora accesso?" ──
+  const rightCol = document.createElement('div');
+  rightCol.style.cssText = 'flex:1;min-width:200px;';
+
+  const rightLabel = document.createElement('p');
+  rightLabel.style.cssText =
+    'font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:8px;font-weight:600;';
+  rightLabel.textContent = 'Non hai ancora accesso?';
+  rightCol.appendChild(rightLabel);
+
+  const waitlistBtn = document.createElement('a');
+  waitlistBtn.href = FORM_BASE;
+  waitlistBtn.target = '_blank';
+  waitlistBtn.rel = 'noopener noreferrer';
+  waitlistBtn.style.cssText =
+    'display:block;text-align:center;padding:9px;border-radius:8px;' +
+    'border:1px solid rgba(255,255,255,0.3);background:transparent;' +
+    'color:#fff;font-size:13px;font-weight:600;text-decoration:none;' +
+    'cursor:pointer;transition:background 0.2s;';
+  waitlistBtn.textContent = 'Unisciti alla lista Pro \u2192';
+  waitlistBtn.addEventListener('mouseenter', () => {
+    waitlistBtn.style.background = 'rgba(255,255,255,0.1)';
+  });
+  waitlistBtn.addEventListener('mouseleave', () => {
+    waitlistBtn.style.background = 'transparent';
+  });
+  rightCol.appendChild(waitlistBtn);
+
+  optionsWrap.append(leftCol, rightCol);
+  card.appendChild(optionsWrap);
+
+  // Focus input
+  input.focus();
+
+  // Submit handlers
   submitBtn.addEventListener('click', () => {
     const email = input.value.trim();
     if (!email) {
       input.style.borderColor = 'var(--coral)';
       return;
     }
-    _handleSubmit(email, msgArea, analysisData, positions, parentContainer, overlay);
+    _handleSubmit(email, msgArea, waitlistBtn, analysisData, positions, parentContainer);
   });
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') submitBtn.click();
   });
-
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-  input.focus();
 }
 
 
-async function _handleSubmit(email, msgArea, analysisData, positions, parentContainer, overlay) {
+async function _handleSubmit(email, msgArea, waitlistBtn, analysisData, positions, parentContainer) {
   msgArea.textContent = '';
   const loadingP = document.createElement('p');
-  loadingP.style.cssText = 'font-size:13px;color:var(--text-s);text-align:center;';
+  loadingP.style.cssText = 'font-size:12px;color:rgba(255,255,255,0.7);';
   loadingP.textContent = 'Verifico accesso...';
   msgArea.appendChild(loadingP);
 
@@ -146,7 +169,7 @@ async function _handleSubmit(email, msgArea, analysisData, positions, parentCont
     const checkData = await checkRes.json();
 
     if (!checkData.access) {
-      _showNotInList(msgArea, email);
+      _showNotInList(msgArea, waitlistBtn, email);
       return;
     }
 
@@ -161,15 +184,12 @@ async function _handleSubmit(email, msgArea, analysisData, positions, parentCont
       .filter(r => r.redundancy_pct > 50)
       .map(r => r.etf_ticker);
 
-    // Factor badges are in factors.dimensions[].tilt
     const factorTilts = (factors.dimensions || [])
       .filter(d => d.tilt && d.tilt !== 'Neutral')
       .map(d => d.name + ' ' + d.tilt);
 
-    // Top holding from sorted holdings list
     const topHolding = holdings.length > 0 ? holdings[0] : null;
 
-    // US weight from country exposure
     const usEntry = countryExposure.find(
       c => c.label === 'United States' || c.label === 'US' || c.label === 'Stati Uniti'
     );
@@ -185,7 +205,7 @@ async function _handleSubmit(email, msgArea, analysisData, positions, parentCont
       factor_profile: factorTilts.length ? factorTilts.join(', ') : null,
     };
 
-    loadingP.textContent = 'Genero analisi AI... ⏳';
+    loadingP.textContent = 'Genero analisi AI... \u23F3';
 
     const aiRes = await fetch('/api/ai-analysis', {
       method: 'POST',
@@ -196,49 +216,47 @@ async function _handleSubmit(email, msgArea, analysisData, positions, parentCont
     if (!aiRes.ok) {
       msgArea.textContent = '';
       const errP = document.createElement('p');
-      errP.style.cssText = 'font-size:13px;color:var(--coral);text-align:center;';
+      errP.style.cssText = 'font-size:12px;color:var(--coral);';
       errP.textContent = 'Errore nell\'analisi AI. Riprova.';
       msgArea.appendChild(errP);
       return;
     }
 
     const aiData = await aiRes.json();
-    overlay.remove();
     _showAIResult(parentContainer, aiData);
 
   } catch {
     msgArea.textContent = '';
     const errP = document.createElement('p');
-    errP.style.cssText = 'font-size:13px;color:var(--coral);text-align:center;';
+    errP.style.cssText = 'font-size:12px;color:var(--coral);';
     errP.textContent = 'Errore di connessione. Riprova.';
     msgArea.appendChild(errP);
   }
 }
 
 
-function _showNotInList(msgArea, email) {
+function _showNotInList(msgArea, waitlistBtn, email) {
   const encoded = encodeURIComponent(email);
   msgArea.textContent = '';
 
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'text-align:center;padding:8px 0;';
-
   const msg = document.createElement('p');
-  msg.style.cssText = 'font-size:14px;font-weight:600;margin-bottom:12px;';
-  msg.textContent = 'Non sei ancora nella lista Pro.';
+  msg.style.cssText = 'font-size:12px;color:rgba(255,255,255,0.8);margin-bottom:6px;';
+  msg.textContent = 'La tua email non ha accesso. Vuoi unirti alla lista?';
+  msgArea.appendChild(msg);
+
+  // Update waitlist button to include email
+  waitlistBtn.href = FORM_BASE + encoded;
 
   const link = document.createElement('a');
   link.href = FORM_BASE + encoded;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
   link.style.cssText =
-    'display:inline-block;background:var(--navy);color:#fff;' +
-    'padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;' +
-    'text-decoration:none;';
-  link.textContent = 'Avvisami al lancio →';
-
-  wrap.append(msg, link);
-  msgArea.appendChild(wrap);
+    'display:inline-block;background:rgba(255,255,255,0.15);color:#fff;' +
+    'padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;' +
+    'text-decoration:none;border:1px solid rgba(255,255,255,0.3);';
+  link.textContent = 'Unisciti alla lista Pro \u2192';
+  msgArea.appendChild(link);
 }
 
 
@@ -256,7 +274,7 @@ function _showAIResult(container, aiData) {
 
   const hdrTitle = document.createElement('span');
   hdrTitle.style.cssText = 'font-size:16px;font-weight:700;';
-  hdrTitle.textContent = '🤖 Analisi AI';
+  hdrTitle.textContent = '\uD83E\uDD16 Analisi AI';
 
   const hdrBadge = document.createElement('span');
   hdrBadge.style.cssText =
