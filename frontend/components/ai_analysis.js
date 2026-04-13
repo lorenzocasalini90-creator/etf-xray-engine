@@ -214,10 +214,15 @@ async function _handleSubmit(email, msgArea, waitlistBtn, analysisData, position
     });
 
     if (!aiRes.ok) {
+      const errBody = await aiRes.json().catch(() => ({}));
+      const errDetail = errBody.detail || 'Errore sconosciuto';
+      console.error('[AI Analysis] HTTP', aiRes.status, errDetail);
       msgArea.textContent = '';
       const errP = document.createElement('p');
       errP.style.cssText = 'font-size:12px;color:var(--coral);';
-      errP.textContent = 'Errore nell\'analisi AI. Riprova.';
+      errP.textContent = aiRes.status === 503
+        ? 'Servizio AI non ancora configurato.'
+        : 'Errore nell\'analisi AI. Riprova.';
       msgArea.appendChild(errP);
       return;
     }

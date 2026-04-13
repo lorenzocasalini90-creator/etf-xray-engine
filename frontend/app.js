@@ -184,13 +184,27 @@ async function onAnalyze(positions, benchmark) {
 
     renderFactor(document.getElementById('s-factor'), { factors: data.factors });
 
-    renderSuggestions(document.getElementById('s-suggestions'), {
-      redundancy: data.redundancy,
-      kpis: data.kpis,
-      positions,
-    });
+    console.log('[DEBUG] DATA KEYS:', Object.keys(data));
+    console.log('[DEBUG] data.kpis:', JSON.stringify(data.kpis));
+    console.log('[DEBUG] data.redundancy:', data.redundancy?.length, 'items');
 
-    renderAICard(document.getElementById('s-ai'), data, positions);
+    try {
+      renderSuggestions(document.getElementById('s-suggestions'), {
+        redundancy: data.redundancy,
+        kpis: data.kpis,
+        positions,
+      });
+      console.log('[DEBUG] renderSuggestions OK, children:', document.getElementById('s-suggestions')?.children.length);
+    } catch (e) {
+      console.error('[DEBUG] renderSuggestions CRASHED:', e);
+    }
+
+    try {
+      renderAICard(document.getElementById('s-ai'), data, positions);
+      console.log('[DEBUG] renderAICard OK, children:', document.getElementById('s-ai')?.children.length);
+    } catch (e) {
+      console.error('[DEBUG] renderAICard CRASHED:', e);
+    }
 
     // Feedback widget (after Factor Fingerprint, before mobile PDF)
     const feedbackWrap = document.createElement('div');
