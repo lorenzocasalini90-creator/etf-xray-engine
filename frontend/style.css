@@ -64,19 +64,24 @@ input, select { font-family: inherit; }
 .topbar-logo span { color: #22C55E; }
 .topbar-nav {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   margin-left: auto;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
 }
+.topbar-nav::-webkit-scrollbar { display: none; }
 .topbar-nav a {
   text-decoration: none;
   color: rgba(255,255,255,0.55);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 6px 14px;
+  padding: 6px 10px;
   border-radius: 6px;
   border-bottom: 2px solid transparent;
   transition: color 0.2s, border-color 0.2s, background 0.15s;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .topbar-nav a:hover {
   color: rgba(255,255,255,0.85);
@@ -864,8 +869,16 @@ input, select { font-family: inherit; }
     padding: 6px 8px !important;
   }
   .btn-pdf { display: none !important; }
-  .topbar-chip { display: none !important; }
-  #topbar-mod { display: none !important; }
+  .topbar-chip {
+    font-size: 10px !important;
+    padding: 3px 8px !important;
+    margin-left: 2px !important;
+  }
+  #topbar-mod {
+    font-size: 10px !important;
+    padding: 4px 8px !important;
+    margin-left: 2px !important;
+  }
 
   /* ── M1. Hero bar: 2×2 grid, hide secondary KPIs ── */
   .hero-stat-secondary { display: none; }

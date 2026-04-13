@@ -184,33 +184,23 @@ async function onAnalyze(positions, benchmark) {
 
     renderFactor(document.getElementById('s-factor'), { factors: data.factors });
 
-    console.log('[DEBUG] DATA KEYS:', Object.keys(data));
-    console.log('[DEBUG] data.kpis:', JSON.stringify(data.kpis));
-    console.log('[DEBUG] data.redundancy:', data.redundancy?.length, 'items');
+    renderSuggestions(document.getElementById('s-suggestions'), {
+      redundancy: data.redundancy,
+      kpis: data.kpis,
+      positions,
+    });
 
-    try {
-      renderSuggestions(document.getElementById('s-suggestions'), {
-        redundancy: data.redundancy,
-        kpis: data.kpis,
-        positions,
-      });
-      console.log('[DEBUG] renderSuggestions OK, children:', document.getElementById('s-suggestions')?.children.length);
-    } catch (e) {
-      console.error('[DEBUG] renderSuggestions CRASHED:', e);
+    renderAICard(document.getElementById('s-ai'), data, positions);
+
+    // Feedback widget (after AI card, before mobile PDF)
+    let feedbackWrap = document.getElementById('s-feedback');
+    if (!feedbackWrap) {
+      feedbackWrap = document.createElement('div');
+      feedbackWrap.id = 's-feedback';
+      feedbackWrap.className = 'report-section';
+      feedbackWrap.style.paddingTop = '0';
+      document.getElementById('report').appendChild(feedbackWrap);
     }
-
-    try {
-      renderAICard(document.getElementById('s-ai'), data, positions);
-      console.log('[DEBUG] renderAICard OK, children:', document.getElementById('s-ai')?.children.length);
-    } catch (e) {
-      console.error('[DEBUG] renderAICard CRASHED:', e);
-    }
-
-    // Feedback widget (after Factor Fingerprint, before mobile PDF)
-    const feedbackWrap = document.createElement('div');
-    feedbackWrap.className = 'report-section';
-    feedbackWrap.style.paddingTop = '0';
-    document.getElementById('report').appendChild(feedbackWrap);
     renderFeedback(feedbackWrap);
 
     // Update topbar

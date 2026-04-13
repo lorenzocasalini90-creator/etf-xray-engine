@@ -139,7 +139,7 @@ function _setupObserver() {
   sections.forEach(s => _observer.observe(s));
 
   // Fallback: near the bottom of the page always highlight the last
-  // section (Factor) — the IntersectionObserver can miss it when the
+  // section — the IntersectionObserver can miss it when the
   // section is shorter than the viewport.
   window.addEventListener('scroll', () => {
     const nearBottom =
@@ -147,10 +147,11 @@ function _setupObserver() {
       document.documentElement.scrollHeight - 120;
     if (nearBottom) {
       links.forEach(a => a.classList.remove('active'));
-      const factorLink = document.querySelector(
-        '.topbar-nav a[data-section="s-factor"]'
+      const lastId = SECTIONS[SECTIONS.length - 1].id;
+      const lastLink = document.querySelector(
+        '.topbar-nav a[data-section="' + lastId + '"]'
       );
-      if (factorLink) factorLink.classList.add('active');
+      if (lastLink) lastLink.classList.add('active');
     }
   }, { passive: true });
 }

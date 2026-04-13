@@ -18,7 +18,7 @@ export function renderSuggestions(container, data) {
 
   const numEl = document.createElement('div');
   numEl.className = 'section-num';
-  numEl.textContent = '⑤';
+  numEl.textContent = '5';
 
   const titleGroup = document.createElement('div');
   titleGroup.className = 'section-title-group';
