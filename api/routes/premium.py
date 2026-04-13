@@ -102,6 +102,8 @@ class AIAnalysisRequest(BaseModel):
 
 @router.post("/ai-analysis")
 async def ai_analysis(req: AIAnalysisRequest):
+    import traceback
+
     email = req.email.strip().lower()
     whitelist = _get_whitelist()
 
@@ -117,33 +119,40 @@ async def ai_analysis(req: AIAnalysisRequest):
     except ImportError:
         raise HTTPException(status_code=503, detail="Servizio AI non disponibile.")
 
-    client = anthropic.Anthropic(api_key=api_key)
-
-    summary = req.portfolio_summary
-    user_prompt = json.dumps(summary.model_dump(), ensure_ascii=False)
-
-    system_prompt = (
-        "Sei un consulente finanziario esperto di ETF. "
-        "L'utente ti fornisce un riepilogo del suo portafoglio ETF. "
-        "Analizzalo e rispondi SOLO con un JSON valido (niente markdown, niente ```), "
-        "con questa struttura:\n"
-        '{"summary": "Una frase semplice che descrive il portafoglio", '
-        '"actions": [{"title": "...", "detail": "...", "priority": "alta|media|bassa"}]}\n'
-        "Massimo 4 azioni. Sii concreto e specifico. Rispondi in italiano."
-    )
-
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=800,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
-
-    raw = message.content[0].text.strip()
-
     try:
-        result = json.loads(raw)
-    except json.JSONDecodeError:
-        result = {"summary": raw, "actions": []}
+        client = anthropic.Anthropic(api_key=api_key)
 
-    return result
+        summary = req.portfolio_summary
+        user_prompt = json.dumps(summary.model_dump(), ensure_ascii=False)
+
+        system_prompt = (
+            "Sei un consulente finanziario esperto di ETF. "
+            "L'utente ti fornisce un riepilogo del suo portafoglio ETF. "
+            "Analizzalo e rispondi SOLO con un JSON valido (niente markdown, niente ```), "
+            "con questa struttura:\n"
+            '{"summary": "Una frase semplice che descrive il portafoglio", '
+            '"actions": [{"title": "...", "detail": "...", "priority": "alta|media|bassa"}]}\n'
+            "Massimo 4 azioni. Sii concreto e specifico. Rispondi in italiano."
+        )
+
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=800,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        raw = message.content[0].text.strip()
+
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            result = {"summary": raw, "actions": []}
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("ai-analysis error: %s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(exc))
