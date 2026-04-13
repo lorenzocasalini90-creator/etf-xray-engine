@@ -17,6 +17,10 @@ const FACTOR_TOOLTIPS = {
     'cap. Vicino a 100 = prevalenza di large cap.',
   'Dividend Yield':
     'Rendimento da dividendi medio ponderato del portafoglio.',
+  'Momentum':
+    'Rendimento medio dei titoli negli ultimi 12 mesi, pesato per ' +
+    'il peso nel portafoglio. >50 = momentum positivo (titoli in ' +
+    'salita), <50 = negativo.',
 };
 
 export function renderFactor(container, data) {

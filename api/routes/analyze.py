@@ -397,6 +397,18 @@ def _build_factors(
                 sigma=round((bench_dy.get("yield_delta") or 0) * 100, 2),
             ))
 
+            # Momentum (only if score is available)
+            mom = scores.get("momentum", {})
+            mom_score = mom.get("score")
+            if mom_score is not None:
+                dimensions.append(FactorDimension(
+                    name="Momentum",
+                    portfolio_score=round(mom_score, 1),
+                    benchmark_score=50.0,  # neutral baseline
+                    tilt="Positivo" if mom_score > 55 else "Negativo" if mom_score < 45 else "Neutro",
+                    sigma=round(mom_score - 50.0, 1),
+                ))
+
             # Determine reliability
             l2_pct = coverage.get("L2_pct", 0)
             if l2_pct >= 60:
@@ -435,9 +447,26 @@ def _build_insights(
     overlap_result: OverlapResult,
     benchmark_name: str | None,
     fetch_warnings: list[str],
+    portfolio_tickers: list[str] | None = None,
 ) -> list[Insight]:
     """Generate portfolio insights."""
     insights: list[Insight] = []
+
+    # Swap-based ETF warnings
+    if portfolio_tickers:
+        from src.analytics.swap_detection import detect_swap_etfs
+        swap_hits = detect_swap_etfs(portfolio_tickers)
+        for hit in swap_hits:
+            insights.append(Insight(
+                severity="warning",
+                title="ETF a replica sintetica rilevato",
+                body=(
+                    f"{hit['label']} ({hit['ticker']}) usa replica sintetica (swap). "
+                    "Le holdings mostrate sono il basket di sostituzione, non "
+                    "l'esposizione economica reale. L'overlap con ETF che tracciano "
+                    "lo stesso indice potrebbe essere sottostimato."
+                ),
+            ))
 
     # Add fetch warnings as insights
     for w in fetch_warnings:
@@ -569,9 +598,11 @@ def analyze_portfolio(request: PortfolioRequest):
     factor_result = _build_factors(aggregated, None)
 
     # 10. Insights
+    portfolio_tickers = [p["ticker"] for p in positions]
     insights = _build_insights(
         aggregated, hhi_stats, active_share_pct,
         redundancy_items, overlap_result, request.benchmark, fetch_warnings,
+        portfolio_tickers=portfolio_tickers,
     )
 
     # 11. Build holdings list

@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass, field
 
 import pandas as pd
+import yfinance as yf
 from sqlalchemy.orm import Session
 
 from typing import TYPE_CHECKING
@@ -318,6 +319,88 @@ class FactorEngine:
             "dividend_yield": {
                 "weighted_yield": round(weighted_dy, 4) if weighted_dy else None,
             },
+            # Momentum is computed separately via _compute_momentum()
+            # and merged in analyze(). Placeholder here for consistency.
+            "momentum": {"weighted_return": None, "score": None},
+        }
+
+    @staticmethod
+    def _fetch_ticker_return(ticker: str) -> float | None:
+        """Fetch 12-month return for a single ticker (thread-safe)."""
+        try:
+            hist = yf.Ticker(ticker).history(period="1y", timeout=2)
+            if hist is None or hist.empty or len(hist) < 2:
+                return None
+            price_old = hist["Close"].iloc[0]
+            price_new = hist["Close"].iloc[-1]
+            if price_old > 0:
+                return (price_new - price_old) / price_old * 100
+        except Exception:
+            return None
+        return None
+
+    def _compute_momentum(
+        self,
+        resolved: dict[str, dict],
+        top_n: int = 10,
+    ) -> dict:
+        """Compute weighted-average 12-month return (momentum score).
+
+        Fetches 1-year price history in parallel for the top-N holdings
+        by weight, computes each holding's 12M return, then a weighted
+        average.
+
+        The raw return is normalised to a 0–100 scale:
+            -50% return → 0, 0% → 50, +50% → 100.
+
+        Returns:
+            Dict with ``weighted_return`` (raw %) and ``score`` (0–100).
+            Both are ``None`` if no price data could be fetched.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # Sort by weight, keep top_n with valid tickers
+        items = sorted(resolved.values(), key=lambda r: r["weight"], reverse=True)
+        ticker_weight: list[tuple[str, float]] = []
+        for r in items:
+            t = r.get("ticker", "")
+            if t:
+                ticker_weight.append((t, r["weight"]))
+            if len(ticker_weight) >= top_n:
+                break
+
+        if not ticker_weight:
+            return {"weighted_return": None, "score": None}
+
+        # Parallel fetch — max 10s total wall-clock
+        ret_sum = 0.0
+        ret_weight = 0.0
+
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = {
+                pool.submit(self._fetch_ticker_return, t): (t, w)
+                for t, w in ticker_weight
+            }
+            for future in as_completed(futures, timeout=10):
+                ticker, w = futures[future]
+                try:
+                    ret_12m = future.result(timeout=0)
+                except Exception:
+                    continue
+                if ret_12m is not None:
+                    ret_sum += ret_12m * w
+                    ret_weight += w
+
+        if ret_weight == 0:
+            return {"weighted_return": None, "score": None}
+
+        weighted_return = ret_sum / ret_weight
+        # Normalise: -50% → 0, 0% → 50, +50% → 100  (clamp 0–100)
+        score = max(0.0, min(100.0, weighted_return + 50.0))
+
+        return {
+            "weighted_return": round(weighted_return, 2),
+            "score": round(score, 1),
         }
 
     def _empty_factors(self) -> dict:
@@ -326,6 +409,7 @@ class FactorEngine:
             "value_growth": {"weighted_pe": None, "weighted_pb": None, "style": "Unknown"},
             "quality": {"weighted_roe": None, "weighted_debt_equity": None},
             "dividend_yield": {"weighted_yield": None},
+            "momentum": {"weighted_return": None, "score": None},
         }
 
     def _find_factor_drivers(
@@ -405,6 +489,20 @@ class FactorEngine:
 
         _progress(0.45, "Classifico titoli per Size e Value/Growth…")
         factor_scores = self._compute_weighted_factors(resolved)
+
+        _progress(0.50, "Calcolo Momentum (rendimenti 12M)…")
+        from concurrent.futures import ThreadPoolExecutor as _TPE, TimeoutError as _TE
+        try:
+            with _TPE(max_workers=1) as _ex:
+                _fut = _ex.submit(self._compute_momentum, resolved)
+                momentum = _fut.result(timeout=8)
+        except _TE:
+            logger.warning("Momentum timeout (>8s) — skipped")
+            momentum = {"weighted_return": None, "score": None}
+        except Exception as exc:
+            logger.warning("Momentum computation failed: %s", exc)
+            momentum = {"weighted_return": None, "score": None}
+        factor_scores["momentum"] = momentum
 
         _progress(0.55, "Identifico factor drivers…")
         factor_drivers = self._find_factor_drivers(resolved)

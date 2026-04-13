@@ -43,6 +43,20 @@ export function renderXRay(container, data) {
     container.appendChild(banner);
   });
 
+  // Warning alerts (swap-based, partial data, etc.)
+  const warnings = (insights || []).filter(i => i.severity === 'warning');
+  warnings.forEach(ins => {
+    const banner = document.createElement('div');
+    banner.className = 'alert-banner warning';
+    const icon = document.createElement('span');
+    icon.className = 'alert-icon';
+    icon.textContent = '\u26A0\uFE0F';
+    const text = document.createElement('span');
+    text.textContent = sanitize(ins.body);
+    banner.append(icon, text);
+    container.appendChild(banner);
+  });
+
   // KPI cards with semantic colors
   const terWaste = data.redundancy
     ? data.redundancy.reduce((s, r) => s + r.ter_waste_eur, 0)
