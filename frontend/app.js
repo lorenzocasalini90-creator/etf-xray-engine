@@ -11,6 +11,8 @@ import { renderOverlap } from './components/overlap.js';
 import { renderSector } from './components/sector.js';
 import { renderFactor } from './components/factor.js';
 import { renderFeedback } from './components/feedback.js';
+import { renderSuggestions } from './components/suggestions.js';
+import { renderAICard } from './components/ai_analysis.js';
 import { fmtEur } from './components/sanitize.js';
 
 // Print: hide Plotly container with visibility:hidden, show HTML table wrapper
@@ -175,6 +177,14 @@ async function onAnalyze(positions, benchmark) {
     });
 
     renderFactor(document.getElementById('s-factor'), { factors: data.factors });
+
+    renderSuggestions(document.getElementById('s-suggestions'), {
+      redundancy: data.redundancy,
+      kpis: data.kpis,
+      positions,
+    });
+
+    renderAICard(document.getElementById('s-ai'), data, positions);
 
     // Feedback widget (after Factor Fingerprint, before mobile PDF)
     const feedbackWrap = document.createElement('div');

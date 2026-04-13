@@ -3,10 +3,11 @@
  */
 
 const SECTIONS = [
-  { id: 's-xray',    label: '\u2460 X-Ray' },
-  { id: 's-overlap', label: '\u2461 Overlap' },
-  { id: 's-sector',  label: '\u2462 Settori' },
-  { id: 's-factor',  label: '\u2463 Factor' },
+  { id: 's-xray',        label: '\u2460 X-Ray' },
+  { id: 's-overlap',     label: '\u2461 Overlap' },
+  { id: 's-sector',      label: '\u2462 Settori' },
+  { id: 's-factor',      label: '\u2463 Factor' },
+  { id: 's-suggestions', label: '\u2464 Cosa fare' },
 ];
 
 let _observer = null;
