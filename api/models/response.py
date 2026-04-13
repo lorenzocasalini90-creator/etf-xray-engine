@@ -89,6 +89,7 @@ class FactorResult(BaseModel):
 
 
 class Insight(BaseModel):
+    type: Optional[str] = None
     severity: str
     title: str
     body: str

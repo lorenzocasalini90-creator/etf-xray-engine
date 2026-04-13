@@ -457,6 +457,7 @@ def _build_insights(
         swap_hits = detect_swap_etfs(portfolio_tickers)
         for hit in swap_hits:
             insights.append(Insight(
+                type="swap_replication",
                 severity="warning",
                 title="ETF a replica sintetica rilevato",
                 body=(
@@ -470,6 +471,7 @@ def _build_insights(
     # Add fetch warnings as insights
     for w in fetch_warnings:
         insights.append(Insight(
+            type="fetch_warning",
             severity="warning",
             title="Dati parziali",
             body=w,
@@ -518,6 +520,7 @@ def _build_insights(
         severity_map = {"high": "critical", "medium": "warning", "info": "positive"}
         for obs in observations:
             insights.append(Insight(
+                type=obs.page,
                 severity=severity_map.get(obs.severity, "warning"),
                 title=obs.page.replace("_", " ").title(),
                 body=obs.text,

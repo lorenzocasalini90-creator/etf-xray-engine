@@ -415,10 +415,11 @@ class FactorEngine:
             <50 = sectors that historically lag
         """
         SECTOR_MOMENTUM: dict[str, float] = {
-            "Technology": 62,
+            # GICS standard names
+            "Information Technology": 62,
             "Consumer Discretionary": 58,
             "Communication Services": 55,
-            "Healthcare": 53,
+            "Health Care": 53,
             "Industrials": 52,
             "Financials": 50,
             "Consumer Staples": 47,
@@ -426,6 +427,9 @@ class FactorEngine:
             "Real Estate": 45,
             "Energy": 43,
             "Utilities": 40,
+            # Short aliases (sector_proxies.py format)
+            "Technology": 62,
+            "Healthcare": 53,
         }
         DEFAULT_SCORE = 50.0
 
