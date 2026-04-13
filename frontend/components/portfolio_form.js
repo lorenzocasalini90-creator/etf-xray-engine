@@ -194,7 +194,10 @@ function _render() {
   btnCta.id = 'btn-analyze';
   btnCta.textContent = 'Analizza Portafoglio';
   btnCta.disabled = _positions.length === 0;
-  card.appendChild(btnCta);
+  const stickyWrap = document.createElement('div');
+  stickyWrap.className = 'btn-cta-sticky-wrap';
+  stickyWrap.appendChild(btnCta);
+  card.appendChild(stickyWrap);
 
   // Secondary actions
   const actions = document.createElement('div');
@@ -317,6 +320,10 @@ function _onFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
   const ext = file.name.split('.').pop().toLowerCase();
+
+  if (typeof gtag === 'function') {
+    gtag('event', 'file_upload', { file_type: ext });
+  }
 
   if (ext === 'xlsx' || ext === 'xls') {
     const reader = new FileReader();

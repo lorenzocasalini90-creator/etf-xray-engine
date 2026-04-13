@@ -185,6 +185,102 @@ export function renderOverlap(container, data) {
     const isMobile = window.innerWidth < 600;
 
     if (isMobile) {
+      // Mini matrice 5×5 su mobile
+      if (overlap.matrix && overlap.matrix.length > 1) {
+        const nm = overlap.tickers.length;
+        const maxShow = Math.min(5, nm);
+
+        const miniSection = document.createElement('div');
+        miniSection.style.cssText =
+          'margin-top:16px;margin-bottom:8px;';
+
+        const note = document.createElement('p');
+        note.style.cssText =
+          'font-size:10px;color:var(--text-t);' +
+          'margin-bottom:8px;font-style:italic;';
+        note.textContent = maxShow < nm
+          ? 'Prime ' + maxShow + '\u00D7' + maxShow + ' ETF \u2014 ' +
+            'visualizza su desktop per la matrice completa'
+          : 'Matrice overlap (Jaccard pesato)';
+        miniSection.appendChild(note);
+
+        const tbl = document.createElement('table');
+        tbl.style.cssText =
+          'width:100%;border-collapse:collapse;' +
+          'font-size:8px;table-layout:fixed;';
+
+        // Header row
+        const mthead = document.createElement('thead');
+        const hr = document.createElement('tr');
+        const thCorner = document.createElement('th');
+        thCorner.style.cssText =
+          'width:52px;border:none;background:#fff;';
+        hr.appendChild(thCorner);
+        for (let j = 0; j < maxShow; j++) {
+          const mth = document.createElement('th');
+          mth.style.cssText =
+            'font-size:7px;padding:2px 1px;' +
+            'text-align:center;border:0.5px solid #E5E7EB;' +
+            'background:#F9FAFB;overflow:hidden;' +
+            'white-space:nowrap;text-overflow:ellipsis;';
+          mth.textContent = _labelShort(
+            overlap.tickers[j], nameMap);
+          hr.appendChild(mth);
+        }
+        mthead.appendChild(hr);
+        tbl.appendChild(mthead);
+
+        // Body
+        const mtbody = document.createElement('tbody');
+        for (let i = 0; i < maxShow; i++) {
+          const tr = document.createElement('tr');
+          const tdL = document.createElement('td');
+          tdL.style.cssText =
+            'font-size:7px;font-weight:600;padding:2px 3px;' +
+            'white-space:nowrap;overflow:hidden;' +
+            'text-overflow:ellipsis;width:52px;' +
+            'border:0.5px solid #E5E7EB;background:#F9FAFB;';
+          tdL.textContent = _labelShort(
+            overlap.tickers[i], nameMap);
+          tr.appendChild(tdL);
+
+          for (let j = 0; j < maxShow; j++) {
+            const val = overlap.matrix[i][j];
+            const diag = i === j;
+            const td = document.createElement('td');
+            const bg = diag    ? '#1B2A4A'
+              : val > 50 ? '#FF6B6B'
+              : val > 35 ? '#FEE2E2'
+              : val > 15 ? '#FEF3C7'
+              : val > 0  ? '#F0FDF4'
+              :             '#FFFFFF';
+            const color = diag    ? '#fff'
+              : val > 50 ? '#fff'
+              : val > 35 ? '#B91C1C'
+              : val > 15 ? '#92400E'
+              : val > 0  ? '#15803D'
+              :             '#D1D5DB';
+            td.style.cssText = [
+              'text-align:center',
+              'padding:2px 1px',
+              'font-size:7px',
+              'border:0.5px solid #E5E7EB',
+              'background:' + bg,
+              'color:' + color,
+              diag ? 'font-weight:700' : '',
+            ].filter(Boolean).join(';');
+            td.textContent = diag ? '\u25A0'
+              : val > 0 ? val.toFixed(1) + '%'
+              : '0';
+            tr.appendChild(td);
+          }
+          mtbody.appendChild(tr);
+        }
+        tbl.appendChild(mtbody);
+        miniSection.appendChild(tbl);
+        container.appendChild(miniSection);
+      }
+
       // Mobile: show sorted pair list instead of heatmap
       const pairs = [];
       const n = overlap.tickers.length;
@@ -297,6 +393,20 @@ export function renderOverlap(container, data) {
       });
     }
   }
+}
+
+function _labelShort(id, nameMap) {
+  if (nameMap && nameMap[id]) {
+    const n = nameMap[id]
+      .replace(/\s+(UCITS|ETF|USD|EUR|GBP|Acc|Inc|Distributing)\b.*/gi, '')
+      .trim();
+    return n.length > 8
+      ? n.substring(0, 7) + '\u2026'
+      : n;
+  }
+  return id.length <= 6
+    ? id
+    : id.substring(0, 6) + '\u2026';
 }
 
 function _displayName(id, nameMap = {}) {

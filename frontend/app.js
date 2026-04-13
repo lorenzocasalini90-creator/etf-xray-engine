@@ -10,6 +10,7 @@ import { renderXRay } from './components/xray.js';
 import { renderOverlap } from './components/overlap.js';
 import { renderSector } from './components/sector.js';
 import { renderFactor } from './components/factor.js';
+import { renderFeedback } from './components/feedback.js';
 import { fmtEur } from './components/sanitize.js';
 
 // Print: hide Plotly container with visibility:hidden, show HTML table wrapper
@@ -98,18 +99,42 @@ async function onAnalyze(positions, benchmark) {
   }
 
   try {
+    // Nascondi landing hero quando parte l'analisi
+    const landingHero = document.getElementById('landing-hero');
+    if (landingHero) landingHero.hidden = true;
+
     const body = { positions };
     if (benchmark) body.benchmark = benchmark;
 
     const res = await _fetchWithRetry(body);
 
     if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detail = err.detail || '';
+
       if (res.status === 504) {
-        throw new Error('Analisi non riuscita. Il server ha impiegato troppo tempo. ' +
-          'Riprova tra qualche secondo — la prossima analisi sarà più veloce.');
+        _gtagError('504');
+        throw new Error(
+          'Prima analisi pi\u00F9 lenta (~40s), attendere... ' +
+          'Riprova tra qualche secondo \u2014 la prossima analisi sar\u00E0 pi\u00F9 veloce.'
+        );
       }
-      const err = await res.json().catch(() => ({ detail: 'Errore sconosciuto' }));
-      throw new Error(err.detail || 'Errore ' + res.status);
+      if (res.status === 422) {
+        _gtagError('validation');
+        throw new Error(detail || 'Dati non validi. Controlla ticker e importi.');
+      }
+      if (res.status === 429) {
+        _gtagError('rate_limit');
+        throw new Error(detail || 'Troppe richieste. Attendi 1 minuto.');
+      }
+      if (res.status === 502 || res.status === 503) {
+        _gtagError('server_overload');
+        _showCountdown(inputSection, 30);
+        throw new Error('Il server \u00E8 occupato. Riprova tra 30 secondi.');
+      }
+
+      _gtagError(String(res.status));
+      throw new Error(detail || 'Errore ' + res.status);
     }
 
     const data = await res.json();
@@ -151,6 +176,13 @@ async function onAnalyze(positions, benchmark) {
 
     renderFactor(document.getElementById('s-factor'), { factors: data.factors });
 
+    // Feedback widget (after Factor Fingerprint, before mobile PDF)
+    const feedbackWrap = document.createElement('div');
+    feedbackWrap.className = 'report-section';
+    feedbackWrap.style.paddingTop = '0';
+    document.getElementById('report').appendChild(feedbackWrap);
+    renderFeedback(feedbackWrap);
+
     // Update topbar
     const nEtfs = positions.length;
     const label = nEtfs + ' ETF \u00B7 ' + fmtEur(totalEur);
@@ -184,9 +216,9 @@ async function onAnalyze(positions, benchmark) {
     });
 
     if (typeof gtag === 'function') {
-      gtag('event', 'analyze_portfolio', {
-        n_etfs: nEtfs,
-        total_eur: totalEur,
+      gtag('event', 'analysis_complete', {
+        etf_count: nEtfs,
+        has_overlap: (data.overlap?.pairs?.length || 0) > 0,
         benchmark: benchmark || 'none',
       });
     }
@@ -199,6 +231,33 @@ async function onAnalyze(positions, benchmark) {
     clearInterval(msgInterval);
     loading.hidden = true;
   }
+}
+
+function _gtagError(errorType) {
+  if (typeof gtag === 'function') {
+    gtag('event', 'analysis_error', { error_type: errorType });
+  }
+}
+
+function _showCountdown(container, seconds) {
+  const prev = container.querySelector('.countdown-banner');
+  if (prev) prev.remove();
+
+  const banner = document.createElement('div');
+  banner.className = 'countdown-banner alert-banner warning';
+  let remaining = seconds;
+  banner.textContent = 'Il server \u00E8 occupato. Riprova tra ' + remaining + 's...';
+  const timer = setInterval(() => {
+    remaining -= 1;
+    if (remaining <= 0) {
+      clearInterval(timer);
+      banner.remove();
+      return;
+    }
+    banner.textContent =
+      'Il server \u00E8 occupato. Riprova tra ' + remaining + 's...';
+  }, 1000);
+  container.prepend(banner);
 }
 
 function _showError(container, message) {
