@@ -19,11 +19,11 @@ from api.routes import analyze, benchmarks, etf_search, health, holdings, premiu
 # ---------------------------------------------------------------------------
 
 class TimeoutMiddleware(BaseHTTPMiddleware):
-    """Return 504 if a request takes longer than 55 seconds."""
+    """Return 504 if a request takes longer than 90 seconds."""
 
     async def dispatch(self, request, call_next):
         try:
-            return await asyncio.wait_for(call_next(request), timeout=55.0)
+            return await asyncio.wait_for(call_next(request), timeout=90.0)
         except asyncio.TimeoutError:
             return JSONResponse(
                 {"detail": "Analisi timeout. Riprova \u2014 la cache si popola al primo tentativo."},

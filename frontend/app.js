@@ -50,6 +50,8 @@ const PROGRESS_MSGS = [
   { t: 10, msg: 'Analizzo overlap e ridondanza...' },
   { t: 15, msg: 'Calcolo factor fingerprint...' },
   { t: 20, msg: 'Quasi pronto...' },
+  { t: 45, msg: 'Quasi pronto, ancora qualche secondo...' },
+  { t: 70, msg: 'Prima analisi più lenta del solito, attendere...' },
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -76,11 +78,15 @@ async function onAnalyze(positions, benchmark) {
   async function _fetchWithRetry(body, maxRetries = 1) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90000);
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
         if (res.status === 504 && attempt < maxRetries) {
           if (loadingMsg) {
             loadingMsg.textContent =
@@ -178,22 +184,13 @@ async function onAnalyze(positions, benchmark) {
 
     renderFactor(document.getElementById('s-factor'), { factors: data.factors });
 
-    console.log('[DEBUG] s-suggestions container:', document.getElementById('s-suggestions'));
-    console.log('[DEBUG] s-ai container:', document.getElementById('s-ai'));
-    console.log('[DEBUG] data.kpis:', data.kpis);
-    console.log('[DEBUG] data.redundancy:', data.redundancy);
-    console.log('[DEBUG] data.factors:', data.factors);
-    console.log('[DEBUG] positions:', positions);
-
     renderSuggestions(document.getElementById('s-suggestions'), {
       redundancy: data.redundancy,
       kpis: data.kpis,
       positions,
     });
-    console.log('[DEBUG] renderSuggestions done, children:', document.getElementById('s-suggestions').children.length);
 
     renderAICard(document.getElementById('s-ai'), data, positions);
-    console.log('[DEBUG] renderAICard done, children:', document.getElementById('s-ai').children.length);
 
     // Feedback widget (after Factor Fingerprint, before mobile PDF)
     const feedbackWrap = document.createElement('div');

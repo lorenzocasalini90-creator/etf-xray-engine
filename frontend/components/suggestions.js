@@ -8,7 +8,9 @@ import { fmtPct, fmtEur } from './sanitize.js';
  * @param {object} data — { redundancy, kpis, positions }
  */
 export function renderSuggestions(container, data) {
+  console.log('[renderSuggestions] called', { container, data });
   const { redundancy = [], kpis = {}, positions = [] } = data;
+  console.log('[renderSuggestions] redundancy:', redundancy.length, 'kpis:', kpis);
   container.textContent = '';
   container.classList.add('fade-in');
 
@@ -66,7 +68,7 @@ export function renderSuggestions(container, data) {
   }
 
   // 3. Top 10 concentration > 40%
-  const top10 = kpis.top10_weight;
+  const top10 = kpis.top10_concentration;
   if (top10 != null && top10 > 40) {
     cards.push({
       text: '⚖️ Alta concentrazione — I top 10 titoli pesano il ' +

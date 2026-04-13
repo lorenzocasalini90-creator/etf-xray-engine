@@ -13,6 +13,7 @@ const FORM_BASE =
  * @param {Array} positions — original positions array
  */
 export function renderAICard(container, analysisData, positions) {
+  console.log('[renderAICard] called', { container, analysisData: Object.keys(analysisData || {}), positions: (positions || []).length });
   container.textContent = '';
 
   // ── Premium CTA card ──
@@ -153,22 +154,35 @@ async function _handleSubmit(email, msgArea, analysisData, positions, parentCont
     const kpis = analysisData.kpis || {};
     const redundancy = analysisData.redundancy || [];
     const factors = analysisData.factors || {};
+    const holdings = analysisData.holdings || [];
+    const countryExposure = analysisData.country_exposure || [];
 
     const highRedundancy = redundancy
       .filter(r => r.redundancy_pct > 50)
       .map(r => r.etf_ticker);
 
-    const factorBadges = (factors.badges || []).map(b => b.label || b).join(', ');
+    // Factor badges are in factors.dimensions[].tilt
+    const factorTilts = (factors.dimensions || [])
+      .filter(d => d.tilt && d.tilt !== 'Neutral')
+      .map(d => d.name + ' ' + d.tilt);
+
+    // Top holding from sorted holdings list
+    const topHolding = holdings.length > 0 ? holdings[0] : null;
+
+    // US weight from country exposure
+    const usEntry = countryExposure.find(
+      c => c.label === 'United States' || c.label === 'US' || c.label === 'Stati Uniti'
+    );
 
     const summary = {
       unique_securities: kpis.unique_securities || null,
       hhi: kpis.hhi || null,
       active_share: kpis.active_share || null,
       high_redundancy_etfs: highRedundancy.length ? highRedundancy : null,
-      top_holding: kpis.top_holding || null,
-      top_weight: kpis.top_weight || null,
-      us_weight: kpis.us_weight || null,
-      factor_profile: factorBadges || null,
+      top_holding: topHolding ? topHolding.name : null,
+      top_weight: topHolding ? topHolding.weight_pct : null,
+      us_weight: usEntry ? usEntry.portfolio_pct : null,
+      factor_profile: factorTilts.length ? factorTilts.join(', ') : null,
     };
 
     loadingP.textContent = 'Genero analisi AI... ⏳';
