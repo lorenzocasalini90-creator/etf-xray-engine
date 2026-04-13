@@ -403,6 +403,54 @@ class FactorEngine:
             "score": round(score, 1),
         }
 
+    @staticmethod
+    def _compute_momentum_proxy(resolved: dict[str, dict]) -> dict:
+        """Sector-based momentum proxy (L3 fallback).
+
+        Uses historical sector momentum tendencies to estimate portfolio
+        momentum when yfinance price data is unavailable.
+
+        Scores per sector (long-run relative momentum tendency, 0–100):
+            >50 = sectors that historically exhibit positive momentum
+            <50 = sectors that historically lag
+        """
+        SECTOR_MOMENTUM: dict[str, float] = {
+            "Technology": 62,
+            "Consumer Discretionary": 58,
+            "Communication Services": 55,
+            "Healthcare": 53,
+            "Industrials": 52,
+            "Financials": 50,
+            "Consumer Staples": 47,
+            "Materials": 46,
+            "Real Estate": 45,
+            "Energy": 43,
+            "Utilities": 40,
+        }
+        DEFAULT_SCORE = 50.0
+
+        score_sum = 0.0
+        weight_sum = 0.0
+
+        for r in resolved.values():
+            sector = r.get("sector", "")
+            w = r.get("weight", 0)
+            if not sector or not w:
+                continue
+            s = SECTOR_MOMENTUM.get(sector, DEFAULT_SCORE)
+            score_sum += s * w
+            weight_sum += w
+
+        if weight_sum == 0:
+            return {"weighted_return": None, "score": 50.0, "source": "proxy"}
+
+        score = score_sum / weight_sum
+        return {
+            "weighted_return": None,
+            "score": round(score, 1),
+            "source": "proxy",
+        }
+
     def _empty_factors(self) -> dict:
         return {
             "size": {"Large": 0, "Mid": 0, "Small": 0, "Unknown": 100},
@@ -497,11 +545,16 @@ class FactorEngine:
                 _fut = _ex.submit(self._compute_momentum, resolved)
                 momentum = _fut.result(timeout=8)
         except _TE:
-            logger.warning("Momentum timeout (>8s) — skipped")
+            logger.warning("Momentum timeout (>8s) — falling back to sector proxy")
             momentum = {"weighted_return": None, "score": None}
         except Exception as exc:
-            logger.warning("Momentum computation failed: %s", exc)
+            logger.warning("Momentum computation failed: %s — falling back to sector proxy", exc)
             momentum = {"weighted_return": None, "score": None}
+
+        # L3 fallback: sector-based proxy when yfinance returns no score
+        if momentum.get("score") is None:
+            momentum = self._compute_momentum_proxy(resolved)
+            logger.info("Momentum using sector proxy: score=%.1f", momentum.get("score", 0))
         factor_scores["momentum"] = momentum
 
         _progress(0.55, "Identifico factor drivers…")

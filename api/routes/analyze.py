@@ -397,17 +397,16 @@ def _build_factors(
                 sigma=round((bench_dy.get("yield_delta") or 0) * 100, 2),
             ))
 
-            # Momentum (only if score is available)
+            # Momentum (always included — uses sector proxy as fallback)
             mom = scores.get("momentum", {})
-            mom_score = mom.get("score")
-            if mom_score is not None:
-                dimensions.append(FactorDimension(
-                    name="Momentum",
-                    portfolio_score=round(mom_score, 1),
-                    benchmark_score=50.0,  # neutral baseline
-                    tilt="Positivo" if mom_score > 55 else "Negativo" if mom_score < 45 else "Neutro",
-                    sigma=round(mom_score - 50.0, 1),
-                ))
+            mom_score = mom.get("score", 50.0) or 50.0
+            dimensions.append(FactorDimension(
+                name="Momentum",
+                portfolio_score=round(mom_score, 1),
+                benchmark_score=50.0,  # neutral baseline
+                tilt="Positivo" if mom_score > 55 else "Negativo" if mom_score < 45 else "Neutro",
+                sigma=round(mom_score - 50.0, 1),
+            ))
 
             # Determine reliability
             l2_pct = coverage.get("L2_pct", 0)
