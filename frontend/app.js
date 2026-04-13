@@ -184,24 +184,24 @@ async function onAnalyze(positions, benchmark) {
 
     renderFactor(document.getElementById('s-factor'), { factors: data.factors });
 
-    renderSuggestions(document.getElementById('s-suggestions'), {
-      redundancy: data.redundancy,
-      kpis: data.kpis,
-      positions,
-    });
-
-    renderAICard(document.getElementById('s-ai'), data, positions);
-
-    // Feedback widget (after AI card, before mobile PDF)
-    let feedbackWrap = document.getElementById('s-feedback');
-    if (!feedbackWrap) {
-      feedbackWrap = document.createElement('div');
-      feedbackWrap.id = 's-feedback';
-      feedbackWrap.className = 'report-section';
-      feedbackWrap.style.paddingTop = '0';
-      document.getElementById('report').appendChild(feedbackWrap);
+    try {
+      renderSuggestions(document.getElementById('s-suggestions'), {
+        redundancy: data.redundancy,
+        kpis: data.kpis,
+        positions,
+      });
+    } catch (e) {
+      console.error('renderSuggestions failed:', e);
     }
-    renderFeedback(feedbackWrap);
+
+    try {
+      renderAICard(document.getElementById('s-ai'), data, positions);
+    } catch (e) {
+      console.error('renderAICard failed:', e);
+    }
+
+    // Feedback widget — always renders, independent of above
+    renderFeedback(document.getElementById('s-feedback'));
 
     // Update topbar
     const nEtfs = positions.length;

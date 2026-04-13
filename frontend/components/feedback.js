@@ -12,8 +12,6 @@ export function renderFeedback(container) {
 
   const card = document.createElement('div');
   card.className = 'feedback-card';
-  card.style.opacity = '0';
-  card.style.transition = 'opacity 0.5s ease';
 
   // Bottone chiudi X
   const closeBtn = document.createElement('button');
@@ -42,8 +40,4 @@ export function renderFeedback(container) {
   card.append(closeBtn, title, btn);
   container.appendChild(card);
 
-  // Fade-in dopo 2 secondi
-  setTimeout(() => {
-    card.style.opacity = '1';
-  }, 2000);
 }
