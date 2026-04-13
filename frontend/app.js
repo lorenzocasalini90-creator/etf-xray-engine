@@ -178,13 +178,22 @@ async function onAnalyze(positions, benchmark) {
 
     renderFactor(document.getElementById('s-factor'), { factors: data.factors });
 
+    console.log('[DEBUG] s-suggestions container:', document.getElementById('s-suggestions'));
+    console.log('[DEBUG] s-ai container:', document.getElementById('s-ai'));
+    console.log('[DEBUG] data.kpis:', data.kpis);
+    console.log('[DEBUG] data.redundancy:', data.redundancy);
+    console.log('[DEBUG] data.factors:', data.factors);
+    console.log('[DEBUG] positions:', positions);
+
     renderSuggestions(document.getElementById('s-suggestions'), {
       redundancy: data.redundancy,
       kpis: data.kpis,
       positions,
     });
+    console.log('[DEBUG] renderSuggestions done, children:', document.getElementById('s-suggestions').children.length);
 
     renderAICard(document.getElementById('s-ai'), data, positions);
+    console.log('[DEBUG] renderAICard done, children:', document.getElementById('s-ai').children.length);
 
     // Feedback widget (after Factor Fingerprint, before mobile PDF)
     const feedbackWrap = document.createElement('div');
