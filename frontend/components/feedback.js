@@ -8,11 +8,7 @@ const FORM_URL = 'https://docs.google.com/forms/d/' +
   'KVhPtAIlfhA/viewform';
 
 export function renderFeedback(container) {
-  // Controlla sessionStorage
-  if (sessionStorage.getItem('cmf_feedback_shown')) {
-    return;
-  }
-  sessionStorage.setItem('cmf_feedback_shown', '1');
+  container.textContent = '';
 
   const card = document.createElement('div');
   card.className = 'feedback-card';
