@@ -16,7 +16,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from src.factors.fundamentals import FundamentalsProvider
+from src.factors.fundamentals import (
+    FundamentalsProvider,
+    is_valid_yfinance_ticker,
+    normalize_ticker_for_yfinance,
+)
 from src.factors.sector_proxies import GICS_SECTOR_MEDIANS, get_sector_proxy
 
 logger = logging.getLogger(__name__)
@@ -327,6 +331,9 @@ class FactorEngine:
     @staticmethod
     def _fetch_ticker_return(ticker: str) -> float | None:
         """Fetch 12-month return for a single ticker (thread-safe)."""
+        ticker = normalize_ticker_for_yfinance(ticker)
+        if not is_valid_yfinance_ticker(ticker):
+            return None
         try:
             hist = yf.Ticker(ticker).history(period="1y", timeout=2)
             if hist is None or hist.empty or len(hist) < 2:
@@ -359,12 +366,12 @@ class FactorEngine:
         """
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        # Sort by weight, keep top_n with valid tickers
+        # Sort by weight, keep top_n with valid yfinance tickers
         items = sorted(resolved.values(), key=lambda r: r["weight"], reverse=True)
         ticker_weight: list[tuple[str, float]] = []
         for r in items:
-            t = r.get("ticker", "")
-            if t:
+            t = normalize_ticker_for_yfinance(r.get("ticker", ""))
+            if t and is_valid_yfinance_ticker(t):
                 ticker_weight.append((t, r["weight"]))
             if len(ticker_weight) >= top_n:
                 break

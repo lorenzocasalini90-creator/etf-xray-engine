@@ -1,6 +1,7 @@
 """Fundamentals provider: fetch and cache security fundamentals via yfinance."""
 
 import logging
+import re
 import time
 from datetime import date, datetime, timedelta
 
@@ -10,6 +11,51 @@ from sqlalchemy.orm import Session
 from src.storage.models import FigiMapping, SecurityFundamental
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Bloomberg → Yahoo Finance ticker conversion
+# ---------------------------------------------------------------------------
+
+BLOOMBERG_TO_YAHOO: dict[str, str] = {
+    "SIE GY": "SIE.DE", "SAP GY": "SAP.DE", "ALV GY": "ALV.DE",
+    "DTE GY": "DTE.DE", "BAS GY": "BAS.DE", "BAYN GY": "BAYN.DE",
+    "MBG GY": "MBG.DE", "BMW GY": "BMW.DE", "MUV2 GY": "MUV2.DE",
+    "NVDA UW": "NVDA", "MSFT UW": "MSFT", "AAPL UW": "AAPL",
+    "AMZN UW": "AMZN", "GOOGL UW": "GOOGL", "GOOG UW": "GOOG",
+    "META UW": "META", "AVGO UW": "AVGO", "TSLA UW": "TSLA",
+    "JPM UN": "JPM", "V UN": "V", "MA UN": "MA", "UNH UN": "UNH",
+    "JNJ UN": "JNJ", "PG UN": "PG", "HD UN": "HD", "TSM UN": "TSM",
+    "MC FP": "MC.PA", "OR FP": "OR.PA", "SAN FP": "SAN.PA",
+    "AI FP": "AI.PA", "BNP FP": "BNP.PA", "SU FP": "SU.PA",
+    "ASML NA": "ASML.AS", "RDSA NA": "SHELL.AS", "INGA NA": "INGA.AS",
+    "ROG SW": "ROG.SW", "NESN SW": "NESN.SW", "NOVN SW": "NOVN.SW",
+    "AZN LN": "AZN.L", "HSBA LN": "HSBA.L", "SHEL LN": "SHEL.L",
+    "ULVR LN": "ULVR.L", "RIO LN": "RIO.L", "BP/ LN": "BP.L",
+    "7203 JT": "7203.T", "6758 JT": "6758.T", "9984 JT": "9984.T",
+}
+
+_VALID_TICKER_RE = re.compile(r"^[A-Za-z0-9.\-^/]+$")
+
+
+def normalize_ticker_for_yfinance(ticker: str) -> str:
+    """Convert Bloomberg-format ticker to Yahoo Finance format."""
+    if not ticker:
+        return ticker
+    clean = ticker.strip()
+    return BLOOMBERG_TO_YAHOO.get(clean, clean)
+
+
+def is_valid_yfinance_ticker(ticker: str) -> bool:
+    """Return False for tickers yfinance cannot resolve (Bloomberg format etc)."""
+    if not ticker or not isinstance(ticker, str):
+        return False
+    t = ticker.strip()
+    if not t or len(t) > 20:
+        return False
+    # Bloomberg tickers contain a space (e.g. "SIE GY")
+    if " " in t:
+        return False
+    return bool(_VALID_TICKER_RE.match(t))
 
 # Cache validity: 7 days
 CACHE_TTL_DAYS = 7
@@ -36,7 +82,7 @@ class FundamentalsProvider:
         max_retries: Max retries per ticker on yfinance failure.
     """
 
-    def __init__(self, session: Session, max_retries: int = 3) -> None:
+    def __init__(self, session: Session, max_retries: int = 1) -> None:
         self.session = session
         self.max_retries = max_retries
 
@@ -94,22 +140,24 @@ class FundamentalsProvider:
 
     def _fetch_from_yfinance(self, ticker: str) -> dict | None:
         """Fetch fundamentals from yfinance. Returns dict or None on failure."""
+        # Normalize Bloomberg → Yahoo format, then validate
+        ticker = normalize_ticker_for_yfinance(ticker)
+        if not is_valid_yfinance_ticker(ticker):
+            logger.debug("Skipping invalid yfinance ticker: %s", ticker)
+            return None
+
         for attempt in range(1, self.max_retries + 1):
             try:
                 stock = yf.Ticker(ticker)
                 info = stock.info
                 if not info or info.get("regularMarketPrice") is None:
-                    logger.warning("yfinance: no data for %s (attempt %d)", ticker, attempt)
-                    if attempt < self.max_retries:
-                        time.sleep(1)
-                        continue
+                    logger.debug("yfinance: no data for %s", ticker)
                     return None
 
                 result = {}
                 for yf_key, db_key in YF_FIELD_MAP.items():
                     val = info.get(yf_key)
                     if val is not None:
-                        # debt_to_equity from yfinance is in %, convert to ratio
                         if yf_key == "debtToEquity":
                             val = val / 100.0
                         result[db_key] = float(val)
@@ -119,9 +167,9 @@ class FundamentalsProvider:
                 return result
             except Exception:
                 logger.warning("yfinance error for %s (attempt %d/%d)",
-                               ticker, attempt, self.max_retries, exc_info=True)
+                               ticker, attempt, self.max_retries)
                 if attempt < self.max_retries:
-                    time.sleep(1)
+                    time.sleep(0.5)
         return None
 
     def fetch(self, ticker: str, figi_id: int) -> dict | None:
@@ -152,7 +200,7 @@ class FundamentalsProvider:
     def fetch_batch(
         self,
         tickers: list[dict],
-        sleep_between: float = 0.5,
+        sleep_between: float = 0.2,
     ) -> dict[str, dict]:
         """Fetch fundamentals for multiple tickers with rate limiting.
 
@@ -165,12 +213,17 @@ class FundamentalsProvider:
             are omitted from the result.
         """
         results: dict[str, dict] = {}
-        for i, item in enumerate(tickers):
+        yf_calls = 0
+        for item in tickers:
             ticker = item["ticker"]
             figi_id = item["figi_id"]
             data = self.fetch(ticker, figi_id)
             if data is not None:
                 results[ticker] = data
-            if i < len(tickers) - 1:
-                time.sleep(sleep_between)
+            # Only sleep between actual yfinance API calls (not cache hits)
+            normalized = normalize_ticker_for_yfinance(ticker)
+            if is_valid_yfinance_ticker(normalized):
+                yf_calls += 1
+                if yf_calls < len(tickers):
+                    time.sleep(sleep_between)
         return results
