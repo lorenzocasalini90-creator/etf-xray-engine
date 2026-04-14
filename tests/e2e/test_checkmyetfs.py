@@ -350,48 +350,6 @@ class TestModuloD:
         result2 = measure("D09 re-analysis", lambda: run_analysis(page))
         assert result2["success"], result2["error_msg"]
 
-    def test_D12_rate_limiting(self, page):
-        """Rate limiter: 3 req/min on /api/analyze.
-
-        Uses the same cached ETF for speed. The rate limiter counts requests
-        per IP per minute regardless of response time.
-        """
-        goto_clean(page)
-        add_etf(page, "SWDA", 10000)
-
-        # Fire 3 analyses as fast as possible (same ETF = cache hit = fast)
-        for i in range(3):
-            result = run_analysis(page)
-            if page.evaluate("!document.getElementById('report').hidden"):
-                page.locator("#topbar-mod").click()
-                page.wait_for_selector("#btn-analyze", timeout=5000)
-
-        # 4th immediately
-        page.locator("#btn-analyze").click()
-
-        # Wait for either rate limit OR report
-        try:
-            page.wait_for_function(
-                """() => {
-                    const body = document.body.textContent.toLowerCase();
-                    const report = document.getElementById('report');
-                    return body.includes('troppe') || body.includes('attendi') ||
-                           (report && !report.hidden);
-                }""",
-                timeout=ANALYSIS_TIMEOUT,
-            )
-        except Exception:
-            pass
-
-        body_text = page.text_content("body").lower()
-        rate_limited = "troppe" in body_text or "attendi" in body_text
-        analysis_ok = page.evaluate("!document.getElementById('report').hidden")
-
-        if not rate_limited and analysis_ok:
-            # Rate limit window may have expired between requests
-            pytest.skip("Rate limit window expired — analyses were too slow to trigger limit")
-        assert rate_limited or analysis_ok, \
-            "Expected rate limit message or successful analysis"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -652,3 +610,56 @@ class TestModuloG:
         if waitlist.count() > 0:
             href = waitlist.get_attribute("href")
             assert "google.com/forms" in href
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MODULO Z — RATE LIMITING (last — saturates the rate limit window)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestModuloZ:
+    """Rate limiting test runs LAST to avoid poisoning other tests."""
+
+    def test_Z01_rate_limiting(self, page):
+        """Rate limiter: 3 req/min on /api/analyze.
+
+        Waits 65s first to ensure the rate limit window from any previous
+        tests has fully expired, then fires 4 rapid analyses.
+        """
+        # Wait for any prior rate limit window to expire
+        time.sleep(65)
+
+        goto_clean(page)
+        add_etf(page, "SWDA", 10000)
+
+        # Fire 3 analyses as fast as possible (same ETF = cache hit = fast)
+        for i in range(3):
+            result = run_analysis(page)
+            if page.evaluate("!document.getElementById('report').hidden"):
+                page.locator("#topbar-mod").click()
+                page.wait_for_selector("#btn-analyze", timeout=5000)
+
+        # 4th immediately
+        page.locator("#btn-analyze").click()
+
+        # Wait for either rate limit OR report
+        try:
+            page.wait_for_function(
+                """() => {
+                    const body = document.body.textContent.toLowerCase();
+                    const report = document.getElementById('report');
+                    return body.includes('troppe') || body.includes('attendi') ||
+                           (report && !report.hidden);
+                }""",
+                timeout=ANALYSIS_TIMEOUT,
+            )
+        except Exception:
+            pass
+
+        body_text = page.text_content("body").lower()
+        rate_limited = "troppe" in body_text or "attendi" in body_text
+        analysis_ok = page.evaluate("!document.getElementById('report').hidden")
+
+        if not rate_limited and analysis_ok:
+            pytest.skip("Rate limit window expired — analyses were too slow to trigger limit")
+        assert rate_limited or analysis_ok, \
+            "Expected rate limit message or successful analysis"
