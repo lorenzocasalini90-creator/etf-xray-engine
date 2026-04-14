@@ -240,7 +240,8 @@ class FetchOrchestrator:
             Successful ``FetchResult`` or ``None``.
         """
         # Issuer-specific
-        if metadata and metadata.issuer:
+        issuer_known = bool(metadata and metadata.issuer)
+        if issuer_known:
             result = self._try_issuer_fetcher(
                 metadata.issuer, lookup_id, as_of_date
             )
@@ -248,21 +249,23 @@ class FetchOrchestrator:
                 return result
 
         # IE ISIN fast path: try iShares directly when metadata is missing
-        if not (metadata and metadata.issuer) and self._looks_like_ie_isin(lookup_id):
+        if not issuer_known and self._looks_like_ie_isin(lookup_id):
             logger.info("IE ISIN detected without issuer info — trying iShares directly")
             result = self._try_issuer_fetcher("ishares", lookup_id, as_of_date)
             if result and result.status != "failed":
                 return result
 
-        # Brute force all fetchers (excluding JustETF, which scores 0.1)
-        result = self._try_all_fetchers(lookup_id, as_of_date)
-        if result and result.status != "failed":
-            return result
-
-        if lookup_id != identifier:
-            result = self._try_all_fetchers(identifier, as_of_date)
+        # Brute force all fetchers — skip if issuer was already identified
+        # (no point trying Amundi for an iShares ETF, etc.)
+        if not issuer_known:
+            result = self._try_all_fetchers(lookup_id, as_of_date)
             if result and result.status != "failed":
                 return result
+
+            if lookup_id != identifier:
+                result = self._try_all_fetchers(identifier, as_of_date)
+                if result and result.status != "failed":
+                    return result
 
         # JustETF fallback — always last resort
         result = self._try_justetf_fallback(lookup_id, metadata)
