@@ -54,6 +54,20 @@ const PROGRESS_MSGS = [
   { t: 70, msg: 'Prima analisi più lenta del solito, attendere...' },
 ];
 
+// Cache last successful analysis to guarantee deterministic re-display
+let _lastAnalysisKey = null;
+let _lastAnalysisData = null;
+let _lastPositions = null;
+let _lastBenchmark = null;
+
+function _analysisKey(positions, benchmark) {
+  const sorted = positions
+    .map(p => p.ticker + ':' + p.amount_eur)
+    .sort()
+    .join('|');
+  return sorted + '||' + (benchmark || '');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   renderTopbar(document.getElementById('topbar'));
   renderPortfolioForm(document.getElementById('portfolio-input'), onAnalyze);
@@ -63,6 +77,15 @@ async function onAnalyze(positions, benchmark) {
   const loading = document.getElementById('loading-overlay');
   const loadingMsg = document.getElementById('loading-msg');
   const inputSection = document.getElementById('portfolio-input');
+
+  // If same portfolio, reuse cached results (guarantees determinism)
+  const key = _analysisKey(positions, benchmark);
+  if (key === _lastAnalysisKey && _lastAnalysisData) {
+    inputSection.hidden = true;
+    document.getElementById('report').hidden = false;
+    _renderReport(_lastAnalysisData, _lastPositions, _lastBenchmark);
+    return;
+  }
   const report = document.getElementById('report');
 
   // Show loading with progress messages
@@ -111,6 +134,12 @@ async function onAnalyze(positions, benchmark) {
     const landingHero = document.getElementById('landing-hero');
     if (landingHero) landingHero.hidden = true;
 
+    // Clear old report sections so stale data is never visible
+    ['s-xray', 's-overlap', 's-sector', 's-factor', 's-suggestions', 's-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '';
+    });
+
     const body = { positions };
     if (benchmark) body.benchmark = benchmark;
 
@@ -147,97 +176,19 @@ async function onAnalyze(positions, benchmark) {
 
     const data = await res.json();
 
+    // Cache for deterministic re-display
+    _lastAnalysisKey = key;
+    _lastAnalysisData = data;
+    _lastPositions = positions;
+    _lastBenchmark = benchmark;
+
     inputSection.hidden = true;
     report.hidden = false;
-
-    const totalEur = positions.reduce((s, p) => s + p.amount_eur, 0);
-
-    renderHero(document.getElementById('hero-bar'), data.kpis, data.fetch_metadata, totalEur);
-
-    const BENCH_LABELS = {
-      MSCI_WORLD: 'MSCI World',
-      SP500: 'S&P 500',
-      MSCI_EM: 'MSCI EM',
-      FTSE_ALL_WORLD: 'FTSE All-World',
-    };
-    const benchmarkLabel = benchmark ? (BENCH_LABELS[benchmark] || benchmark) : 'benchmark';
-
-    renderXRay(document.getElementById('s-xray'), {
-      holdings: data.holdings,
-      active_bets: data.active_bets,
-      insights: data.insights,
-      kpis: data.kpis,
-      redundancy: data.redundancy,
-      benchmark_label: benchmarkLabel,
-    });
-
-    renderOverlap(document.getElementById('s-overlap'), {
-      redundancy: data.redundancy,
-      overlap: data.overlap,
-      insights: data.insights,
-    });
-
-    renderSector(document.getElementById('s-sector'), {
-      sector_exposure: data.sector_exposure,
-      country_exposure: data.country_exposure,
-    });
-
-    renderFactor(document.getElementById('s-factor'), { factors: data.factors });
-
-    try {
-      renderSuggestions(document.getElementById('s-suggestions'), {
-        redundancy: data.redundancy,
-        kpis: data.kpis,
-        positions,
-      });
-    } catch (e) {
-      console.error('renderSuggestions failed:', e);
-    }
-
-    try {
-      renderAICard(document.getElementById('s-ai'), data, positions);
-    } catch (e) {
-      console.error('renderAICard failed:', e);
-    }
-
-    // Feedback widget — always renders, independent of above
-    renderFeedback(document.getElementById('s-feedback'));
-
-    // Update topbar
-    const nEtfs = positions.length;
-    const label = nEtfs + ' ETF \u00B7 ' + fmtEur(totalEur);
-    showNav(label);
-
-    const maxRedundancy = data.redundancy.length > 0
-      ? Math.max(...data.redundancy.map(r => r.redundancy_pct))
-      : 0;
-    setOverlapAlert(maxRedundancy > 70);
-
-    // Add mobile PDF button at bottom of report (if not already present)
-    if (!document.getElementById('btn-pdf-mobile')) {
-      const mobilePdf = document.createElement('div');
-      mobilePdf.style.cssText = 'padding:16px 12px 32px;display:none;';
-      mobilePdf.className = 'mobile-pdf-wrap';
-      const btn = document.createElement('button');
-      btn.id = 'btn-pdf-mobile';
-      btn.className = 'btn-cta';
-      btn.style.cssText =
-        'width:100%;font-size:14px;padding:13px;' +
-        'display:flex;align-items:center;' +
-        'justify-content:center;gap:8px;';
-      btn.textContent = '\uD83D\uDCC4 Esporta PDF';
-      btn.addEventListener('click', () => { window.print(); });
-      mobilePdf.appendChild(btn);
-      report.appendChild(mobilePdf);
-    }
-
-    requestAnimationFrame(() => {
-      document.getElementById('s-xray').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    _renderReport(data, positions, benchmark);
 
     if (typeof gtag === 'function') {
       gtag('event', 'analysis_complete', {
-        etf_count: nEtfs,
+        etf_count: positions.length,
         has_overlap: (data.overlap?.pairs?.length || 0) > 0,
         benchmark: benchmark || 'none',
       });
@@ -296,4 +247,90 @@ function _showError(container, message) {
   btn.addEventListener('click', () => card.remove());
   card.append(h3, p, btn);
   container.appendChild(card);
+}
+
+function _renderReport(data, positions, benchmark) {
+  const report = document.getElementById('report');
+  const totalEur = positions.reduce((s, p) => s + p.amount_eur, 0);
+
+  renderHero(document.getElementById('hero-bar'), data.kpis, data.fetch_metadata, totalEur);
+
+  const BENCH_LABELS = {
+    MSCI_WORLD: 'MSCI World',
+    SP500: 'S&P 500',
+    MSCI_EM: 'MSCI EM',
+    FTSE_ALL_WORLD: 'FTSE All-World',
+  };
+  const benchmarkLabel = benchmark ? (BENCH_LABELS[benchmark] || benchmark) : 'benchmark';
+
+  renderXRay(document.getElementById('s-xray'), {
+    holdings: data.holdings,
+    active_bets: data.active_bets,
+    insights: data.insights,
+    kpis: data.kpis,
+    redundancy: data.redundancy,
+    benchmark_label: benchmarkLabel,
+  });
+
+  renderOverlap(document.getElementById('s-overlap'), {
+    redundancy: data.redundancy,
+    overlap: data.overlap,
+    insights: data.insights,
+  });
+
+  renderSector(document.getElementById('s-sector'), {
+    sector_exposure: data.sector_exposure,
+    country_exposure: data.country_exposure,
+  });
+
+  renderFactor(document.getElementById('s-factor'), { factors: data.factors });
+
+  try {
+    renderSuggestions(document.getElementById('s-suggestions'), {
+      redundancy: data.redundancy,
+      kpis: data.kpis,
+      positions,
+    });
+  } catch (e) {
+    console.error('renderSuggestions failed:', e);
+  }
+
+  try {
+    renderAICard(document.getElementById('s-ai'), data, positions);
+  } catch (e) {
+    console.error('renderAICard failed:', e);
+  }
+
+  renderFeedback(document.getElementById('s-feedback'));
+
+  const nEtfs = positions.length;
+  const label = nEtfs + ' ETF \u00B7 ' + fmtEur(totalEur);
+  showNav(label);
+
+  const maxRedundancy = data.redundancy.length > 0
+    ? Math.max(...data.redundancy.map(r => r.redundancy_pct))
+    : 0;
+  setOverlapAlert(maxRedundancy > 70);
+
+  // Mobile PDF button
+  if (!document.getElementById('btn-pdf-mobile')) {
+    const mobilePdf = document.createElement('div');
+    mobilePdf.style.cssText = 'padding:16px 12px 32px;display:none;';
+    mobilePdf.className = 'mobile-pdf-wrap';
+    const btn = document.createElement('button');
+    btn.id = 'btn-pdf-mobile';
+    btn.className = 'btn-cta';
+    btn.style.cssText =
+      'width:100%;font-size:14px;padding:13px;' +
+      'display:flex;align-items:center;' +
+      'justify-content:center;gap:8px;';
+    btn.textContent = '\uD83D\uDCC4 Esporta PDF';
+    btn.addEventListener('click', () => { window.print(); });
+    mobilePdf.appendChild(btn);
+    report.appendChild(mobilePdf);
+  }
+
+  requestAnimationFrame(() => {
+    document.getElementById('s-xray').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
