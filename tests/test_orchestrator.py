@@ -159,7 +159,7 @@ class TestFetchOrchestratorCascade:
         result = orch.fetch("ANYTHING")
 
         assert result.status == "failed"
-        assert "Could not fetch" in result.message
+        assert "non disponibil" in result.message.lower()
 
     def test_higher_confidence_tried_first(self, mock_registry, success_fetcher, low_confidence_fetcher):
         mock_registry._fetchers = [low_confidence_fetcher, success_fetcher]

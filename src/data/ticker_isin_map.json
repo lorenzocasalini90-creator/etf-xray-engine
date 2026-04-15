@@ -707,7 +707,9 @@
     "ZBH": "US98956P1021",
     "ZBRA": "US9892071054",
     "ZPRS": "IE00BSPLC298",
-    "ZTS": "US98978V1035"
+    "ZTS": "US98978V1035",
+    "UST": "IE00B14X4S71",
+    "RBOT": "IE00BYZK4552"
   },
   "isin_to_ticker": {
     "AN8068571086": "SLB",
@@ -1418,6 +1420,8 @@
     "US98419M1009": "XYL",
     "US9892071054": "ZBRA",
     "US98956P1021": "ZBH",
-    "US98978V1035": "ZTS"
+    "US98978V1035": "ZTS",
+    "IE00B14X4S71": "UST",
+    "IE00BYZK4552": "RBOT"
   }
 }

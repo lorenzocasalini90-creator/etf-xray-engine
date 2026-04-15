@@ -202,9 +202,8 @@ class FetchOrchestrator:
         return FetchResult(
             status="failed",
             message=(
-                f"Could not fetch holdings for '{identifier}'. "
-                f"Tried all registered fetchers and JustETF fallback. "
-                f"Check that the identifier is valid and the ETF is supported."
+                f"Dati non disponibili per '{identifier}'. "
+                f"Verifica il ticker o ISIN su justETF.com"
             ),
             source="FetchOrchestrator",
         )

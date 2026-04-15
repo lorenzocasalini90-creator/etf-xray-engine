@@ -83,13 +83,17 @@ def _fetch_all(
                         sources.append(f"{ticker}:{result.source}")
                     else:
                         warnings.append(
-                            f"{ticker}: nessuna holding disponibile (source={result.source})"
+                            f"Dati non disponibili per '{ticker}'. "
+                            f"Verifica il ticker o ISIN su justETF.com"
                         )
                 else:
-                    warnings.append(f"{ticker}: {result.message}")
+                    warnings.append(f"{result.message}")
             except Exception as exc:
                 logger.error("Fetch failed for %s: %s", ticker, exc)
-                warnings.append(f"{ticker}: fetch error — {exc}")
+                warnings.append(
+                    f"Dati non disponibili per '{ticker}'. "
+                    f"Verifica il ticker o ISIN su justETF.com"
+                )
 
     requested = [p["ticker"] for p in positions]
     missing = [t for t in requested if t not in holdings_db]
@@ -546,7 +550,7 @@ def analyze_portfolio(request: PortfolioRequest):
     if not holdings_db:
         raise HTTPException(
             status_code=422,
-            detail="Could not fetch holdings for any ETF. " + "; ".join(fetch_warnings),
+            detail="Nessun dato trovato per gli ETF inseriti. " + "; ".join(fetch_warnings),
         )
 
     # 2. Aggregate portfolio

@@ -41,6 +41,7 @@ AMUNDI_PRODUCTS: dict[str, str] = {
     "500U": "LU1681049018",
     # Europe
     "PCEU": "LU1681042609",
+    "MEUD": "LU2572257124",
     "CE8": "LU1681042781",
     # Thematic / Sector
     "ANEW": "LU1681041544",
@@ -62,7 +63,7 @@ for _t, _i in AMUNDI_PRODUCTS.items():
         _ISIN_TO_TICKER[_i] = _t
 
 # ISIN prefix patterns characteristic of Amundi
-AMUNDI_ISIN_PREFIXES: tuple[str, ...] = ("LU1681", "LU2090", "LU2089", "LU1437", "LU0252", "FR0010")
+AMUNDI_ISIN_PREFIXES: tuple[str, ...] = ("LU1681", "LU1829", "LU2090", "LU2089", "LU2572", "LU1437", "LU0252", "FR0010")
 
 # ---------------------------------------------------------------------------
 # API configuration
