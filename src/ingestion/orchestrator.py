@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import csv
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from datetime import date
@@ -14,6 +16,44 @@ from src.storage.cache import HoldingsCacheManager
 logger = logging.getLogger(__name__)
 
 METADATA_TIMEOUT = 30  # max seconds for resolve_metadata before giving up
+
+# ---------------------------------------------------------------------------
+# Local metadata cache from etf_directory.csv — avoids 30s JustETF timeout
+# ---------------------------------------------------------------------------
+_LOCAL_DIRECTORY: dict[str, dict[str, str]] = {}
+
+
+def _load_local_directory() -> dict[str, dict[str, str]]:
+    """Load etf_directory.csv into a dict keyed by ISIN and ticker."""
+    if _LOCAL_DIRECTORY:
+        return _LOCAL_DIRECTORY
+    csv_path = os.path.join(
+        os.path.dirname(__file__), "..", "dashboard", "data", "etf_directory.csv"
+    )
+    csv_path = os.path.normpath(csv_path)
+    if not os.path.isfile(csv_path):
+        return _LOCAL_DIRECTORY
+    try:
+        with open(csv_path, newline="", encoding="utf-8") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                isin = (row.get("isin") or "").strip().upper()
+                ticker = (row.get("ticker") or "").strip().upper()
+                entry = {
+                    "isin": isin,
+                    "ticker": ticker,
+                    "name": row.get("name", ""),
+                    "provider": row.get("provider", ""),
+                    "ter_pct": row.get("ter_pct", ""),
+                }
+                if isin:
+                    _LOCAL_DIRECTORY[isin] = entry
+                if ticker:
+                    _LOCAL_DIRECTORY[ticker] = entry
+        logger.info("Loaded %d entries from local ETF directory", len(_LOCAL_DIRECTORY))
+    except Exception as exc:
+        logger.warning("Failed to load local ETF directory: %s", exc)
+    return _LOCAL_DIRECTORY
 
 
 @dataclass
@@ -37,12 +77,30 @@ class _MetadataTimeout(Exception):
     """Raised when metadata resolution exceeds the allowed time."""
 
 
-def resolve_metadata(identifier: str) -> ETFMetadata | None:
-    """Resolve ETF metadata via JustETFFetcher (if justetf-scraping installed).
+def _resolve_from_local_directory(identifier: str) -> ETFMetadata | None:
+    """Fast local metadata resolution from etf_directory.csv."""
+    directory = _load_local_directory()
+    entry = directory.get(identifier.strip().upper())
+    if not entry:
+        return None
+    ter = None
+    try:
+        ter = float(entry["ter_pct"]) if entry.get("ter_pct") else None
+    except (ValueError, TypeError):
+        pass
+    return ETFMetadata(
+        isin=entry.get("isin") or None,
+        issuer=entry.get("provider") or None,
+        name=entry.get("name") or None,
+        ter=ter,
+    )
 
-    Uses ``JustETFFetcher.get_metadata()`` which calls ``get_etf_overview``
-    to obtain ISIN, issuer name, TER, fund size for any UCITS ETF.
-    Times out after ``METADATA_TIMEOUT`` seconds to prevent hanging.
+
+def resolve_metadata(identifier: str) -> ETFMetadata | None:
+    """Resolve ETF metadata — first from local CSV, then via JustETF HTTP.
+
+    Checks ``etf_directory.csv`` for an instant local match before falling
+    back to ``JustETFFetcher.get_metadata()`` (HTTP, up to 30s timeout).
 
     Args:
         identifier: ETF ticker, ISIN, or name.
@@ -50,6 +108,13 @@ def resolve_metadata(identifier: str) -> ETFMetadata | None:
     Returns:
         ``ETFMetadata`` with available fields, or ``None`` if resolution fails.
     """
+    # Fast path: local directory lookup (0ms)
+    local = _resolve_from_local_directory(identifier)
+    if local:
+        logger.info("Local directory hit for %s → issuer=%s", identifier, local.issuer)
+        return local
+
+    # Slow path: JustETF HTTP call (up to 30s)
     try:
         from src.ingestion.justetf import JustETFFetcher
 

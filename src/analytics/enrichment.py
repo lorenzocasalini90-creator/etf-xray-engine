@@ -189,6 +189,39 @@ STATIC_SECTOR_COUNTRY: dict[str, tuple[str, str]] = {
     "ERSTE GROUP": ("Financials", "Austria"),
     "RAIFFEISEN": ("Financials", "Austria"),
     "COMMERZBANK": ("Financials", "Germany"),
+    # European banks — additional
+    "BANCO SANTANDER": ("Financials", "Spain"),
+    "SANTANDER": ("Financials", "Spain"),
+    "UNICREDIT": ("Financials", "Italy"),
+    "BANCO BILBAO": ("Financials", "Spain"),
+    "BBVA": ("Financials", "Spain"),
+    "BNP PARIBAS": ("Financials", "France"),
+    "ING GROUP": ("Financials", "Netherlands"),
+    "ING GROEP": ("Financials", "Netherlands"),
+    "INTESA SANPAOLO": ("Financials", "Italy"),
+    "CAIXABANK": ("Financials", "Spain"),
+    # Consumer / Industrials — European
+    "THULE GROUP": ("Consumer Discretionary", "Sweden"),
+    "THULE": ("Consumer Discretionary", "Sweden"),
+    "MTU AERO ENGINES": ("Industrials", "Germany"),
+    "MTU AERO": ("Industrials", "Germany"),
+    "GENERAL ELECTRIC": ("Industrials", "United States"),
+    "GE AEROSPACE": ("Industrials", "United States"),
+    "MELROSE INDUSTRIES": ("Industrials", "United Kingdom"),
+    "CHEMRING GROUP": ("Industrials", "United Kingdom"),
+    "INDRA SISTEMAS": ("Information Technology", "Spain"),
+    "INDRA": ("Information Technology", "Spain"),
+    "LEONARDO DRS": ("Industrials", "United States"),
+    "ASELSAN": ("Industrials", "Turkey"),
+    "ISRAEL AEROSPACE": ("Industrials", "Israel"),
+    "KOREAN AIR": ("Industrials", "South Korea"),
+    "TURKISH AEROSPACE": ("Industrials", "Turkey"),
+    "FINCANTIERI": ("Industrials", "Italy"),
+    "DIEHL": ("Industrials", "Germany"),
+    "TRASTOR": ("Industrials", "Greece"),
+    "THYSSENKRUPP": ("Industrials", "Germany"),
+    "NAVAL GROUP": ("Industrials", "France"),
+    "MBDA": ("Industrials", "France"),
     # Energy — additional
     "REPSOL": ("Energy", "Spain"),
     "GALP": ("Energy", "Portugal"),
@@ -530,9 +563,11 @@ def _enrich_from_yfinance(
         else:
             unique_lookups.append((idx, key))
 
-    # Fetch from yfinance (or cache)
+    # Fetch from yfinance (or cache) with time budget
     fetched: dict[str, dict[str, str]] = {}
     cache_dirty = False
+    yf_time_budget = 30.0  # max seconds for all yfinance calls
+    yf_start = time.time()
 
     for _, key in unique_lookups:
         upper_key = key.upper()
@@ -543,6 +578,14 @@ def _enrich_from_yfinance(
         if upper_key in yf_cache:
             fetched[upper_key] = yf_cache[upper_key]
             continue
+
+        # Bail out if time budget exceeded
+        if time.time() - yf_start > yf_time_budget:
+            logger.info(
+                "yfinance time budget (%.0fs) exceeded, skipping remaining lookups",
+                yf_time_budget,
+            )
+            break
 
         # Fetch from yfinance
         try:

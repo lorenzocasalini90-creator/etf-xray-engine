@@ -40,6 +40,7 @@ AMUNDI_PRODUCTS: dict[str, str] = {
     "PE500": "LU1681048804",
     "500U": "LU1681049018",
     # Europe
+    "VALEU": "LU1681042518",
     "PCEU": "LU1681042609",
     "MEUD": "LU2572257124",
     "CE8": "LU1681042781",
@@ -248,6 +249,7 @@ class AmundiFetcher(BaseFetcher):
                 data = resp.json()
                 products = data.get("products", [])
                 if not products:
+                    # No products is a permanent condition — don't retry
                     raise ValueError(
                         f"Amundi API returned no products for ISIN {isin}. "
                         f"This ISIN may not be an Amundi ETF."
@@ -263,7 +265,9 @@ class AmundiFetcher(BaseFetcher):
                     attempt + 1, MAX_RETRIES, isin, exc, wait,
                 )
                 time.sleep(wait)
-            except (requests.RequestException, ValueError) as exc:
+            except ValueError:
+                raise  # "no products" = permanent, don't retry
+            except requests.RequestException as exc:
                 last_exc = exc
                 wait = BACKOFF_BASE ** attempt
                 logger.warning(
