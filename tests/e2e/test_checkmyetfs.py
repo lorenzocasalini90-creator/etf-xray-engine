@@ -442,7 +442,10 @@ class TestModuloE:
         )
         # After "not in list" response, ALL Google Form links should have email
         # (both the right column link and the inline link get updated)
-        page.wait_for_timeout(500)  # ensure DOM updates complete
+        # Wait for the inline link with email to appear (more robust than fixed timeout)
+        page.wait_for_selector(
+            "#s-ai a[href*='test%40example.com']", timeout=5_000
+        )
         links = page.locator("#s-ai a[href*='google.com/forms']")
         assert links.count() > 0, "Waitlist Google Form link not found"
         # Check the LAST link (inline one created by _showNotInList)
